@@ -54,7 +54,7 @@ A comprehensive school management system built with Next.js (React) frontend and
 
 1. **Clone the repository**
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/susin-d/SH_GIN.git
    cd SM_GIN_Ver.1.0
    ```
 
