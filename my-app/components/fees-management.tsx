@@ -1,658 +1,353 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useMemo } from "react"
+import { useAuth } from "@/lib/auth-context"
+import { api, apiClient } from "@/lib/api"
+import { useToast } from "@/hooks/use-toast"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Progress } from "@/components/ui/progress"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Progress } from "@/components/ui/progress"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
-  DollarSign,
-  CreditCard,
-  FileText,
-  Calendar,
-  AlertCircle,
-  CheckCircle,
-  Plus,
-  Download,
-  Send,
-  Eye,
-  Edit,
-  Users,
+  DollarSign, FileText, AlertCircle, CheckCircle, Plus, Download, Send, Eye, Edit, Loader2, Search,
 } from "lucide-react"
+import { FeeStructureManagement } from "./fee-structure-management"
+import { FeeReportDashboard } from "./fee-report-dashboard"
 
-// Mock data for fees
-const mockFeeStats = {
-  totalCollected: 125000,
-  totalPending: 35000,
-  totalOverdue: 8500,
-  collectionRate: 88.5,
+// --- TypeScript Interfaces ---
+interface Student {
+  user: { id: number; first_name: string; last_name: string; username: string; }
+  school_class: string
 }
-
-const mockFeeStructure = [
-  { id: 1, name: "Tuition Fee", amount: 2500, frequency: "Monthly", category: "Academic" },
-  { id: 2, name: "Library Fee", amount: 150, frequency: "Semester", category: "Academic" },
-  { id: 3, name: "Lab Fee", amount: 300, frequency: "Semester", category: "Academic" },
-  { id: 4, name: "Sports Fee", amount: 200, frequency: "Annual", category: "Activities" },
-  { id: 5, name: "Transport Fee", amount: 400, frequency: "Monthly", category: "Transport" },
-]
-
-const mockStudentFees = [
-  {
-    id: 1,
-    studentName: "Alice Johnson",
-    studentId: "STU001",
-    class: "10-A",
-    totalDue: 3200,
-    totalPaid: 2800,
-    status: "partial",
-    dueDate: "2024-01-15",
-  },
-  {
-    id: 2,
-    studentName: "Bob Smith",
-    studentId: "STU002",
-    class: "10-A",
-    totalDue: 3200,
-    totalPaid: 3200,
-    status: "paid",
-    dueDate: "2024-01-15",
-  },
-  {
-    id: 3,
-    studentName: "Carol Davis",
-    studentId: "STU003",
-    class: "10-B",
-    totalDue: 3200,
-    totalPaid: 0,
-    status: "pending",
-    dueDate: "2024-01-15",
-  },
-  {
-    id: 4,
-    studentName: "David Wilson",
-    studentId: "STU004",
-    class: "9-A",
-    totalDue: 3200,
-    totalPaid: 1600,
-    status: "overdue",
-    dueDate: "2024-01-10",
-  },
-]
-
-const mockMyFees = [
-  {
-    id: 1,
-    feeName: "Tuition Fee - January",
-    amount: 2500,
-    dueDate: "2024-01-15",
-    status: "paid",
-    paidDate: "2024-01-12",
-    category: "Academic",
-  },
-  {
-    id: 2,
-    feeName: "Library Fee - Spring Semester",
-    amount: 150,
-    dueDate: "2024-01-20",
-    status: "pending",
-    paidDate: null,
-    category: "Academic",
-  },
-  {
-    id: 3,
-    feeName: "Lab Fee - Spring Semester",
-    amount: 300,
-    dueDate: "2024-01-25",
-    status: "pending",
-    paidDate: null,
-    category: "Academic",
-  },
-  {
-    id: 4,
-    feeName: "Transport Fee - January",
-    amount: 400,
-    dueDate: "2024-01-30",
-    status: "overdue",
-    paidDate: null,
-    category: "Transport",
-  },
-]
-
-const mockPaymentHistory = [
-  {
-    id: 1,
-    date: "2024-01-12",
-    description: "Tuition Fee - January",
-    amount: 2500,
-    method: "Online Banking",
-    status: "completed",
-  },
-  {
-    id: 2,
-    date: "2023-12-15",
-    description: "Tuition Fee - December",
-    amount: 2500,
-    method: "Credit Card",
-    status: "completed",
-  },
-  {
-    id: 3,
-    date: "2023-12-10",
-    description: "Sports Fee - Annual",
-    amount: 200,
-    method: "Cash",
-    status: "completed",
-  },
-]
-
-interface FeesManagementProps {
-  userRole: "principal" | "teacher" | "student"
-}
+interface SchoolClass { id: number; name: string; }
+interface Fee { id: number; student: Student; amount: string; due_date: string; status: "paid" | "unpaid" | "partial"; }
+interface FeeStats { totalCollected: number; totalPending: number; totalOverdue: number; collectionRate: number; }
+interface StatusDistribution { paidPercent: number; pendingPercent: number; overduePercent: number; }
+interface FeesManagementProps { userRole: "principal" | "teacher" | "student"; }
 
 export function FeesManagement({ userRole }: FeesManagementProps) {
+  const { toast } = useToast()
+  const { user: currentUser } = useAuth()
   const [activeTab, setActiveTab] = useState("overview")
+  const [allFees, setAllFees] = useState<Fee[]>([])
+  const [students, setStudents] = useState<Student[]>([])
+  const [classes, setClasses] = useState<SchoolClass[]>([])
+  const [feeStats, setFeeStats] = useState<FeeStats | null>(null)
+  const [distribution, setDistribution] = useState<StatusDistribution | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [isFeeDialogOpen, setIsFeeDialogOpen] = useState(false)
+  const [applyTo, setApplyTo] = useState<'student' | 'class'>('student')
+  const [feeFormData, setFeeFormData] = useState({ target_id: '', amount: '', due_date: '' })
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "paid":
-        return "bg-green-100 text-green-800"
-      case "pending":
-        return "bg-yellow-100 text-yellow-800"
-      case "overdue":
-        return "bg-red-100 text-red-800"
-      case "partial":
-        return "bg-blue-100 text-blue-800"
-      default:
-        return "bg-gray-100 text-gray-800"
+  const fetchData = async () => {
+    if (userRole === 'student') {
+      // For students, show a simple fee information view
+      setIsLoading(false);
+      return;
     }
+
+    if (userRole !== 'principal') { setIsLoading(false); return; }
+    setIsLoading(true); setError(null);
+    try {
+      const [feesRes, studentsRes, classesRes] = await Promise.all([api.fees.list(), api.students.list(), api.classes.list()])
+      if (feesRes.success) { setAllFees(feesRes.data as Fee[]); calculateStatsAndDistribution(feesRes.data as Fee[]); }
+      else { throw new Error(feesRes.message) }
+      if (studentsRes.success) { setStudents(studentsRes.data as Student[]) }
+      else { throw new Error(studentsRes.message) }
+      if (classesRes.success) { setClasses(classesRes.data as SchoolClass[]) }
+      else { throw new Error(classesRes.message) }
+    } catch (err: any) { setError(err.message || "An unexpected error occurred.") }
+    finally { setIsLoading(false) }
   }
 
-  const getCategoryColor = (category: string) => {
-    switch (category) {
-      case "Academic":
-        return "bg-blue-100 text-blue-800"
-      case "Activities":
-        return "bg-green-100 text-green-800"
-      case "Transport":
-        return "bg-purple-100 text-purple-800"
-      default:
-        return "bg-gray-100 text-gray-800"
-    }
-  }
+  useEffect(() => { fetchData() }, [userRole, currentUser])
 
-  // Principal view - full fees management
-  if (userRole === "principal") {
+  const calculateStatsAndDistribution = (fees: Fee[]) => {
+    const stats: FeeStats = { totalCollected: 0, totalPending: 0, totalOverdue: 0, collectionRate: 0 };
+    let totalAmount = 0;
+    const counts = { paid: 0, pending: 0, overdue: 0, total: fees.length };
+    fees.forEach(fee => {
+      const amount = parseFloat(fee.amount);
+      totalAmount += amount;
+      const isOverdue = new Date(fee.due_date) < new Date() && fee.status !== 'paid';
+      if (fee.status === 'paid') { stats.totalCollected += amount; counts.paid++; }
+      else { stats.totalPending += amount; if (isOverdue) { stats.totalOverdue += amount; counts.overdue++; } else { counts.pending++; } }
+    });
+    stats.collectionRate = totalAmount > 0 ? parseFloat(((stats.totalCollected / totalAmount) * 100).toFixed(1)) : 0;
+    setFeeStats(stats);
+    setDistribution({
+      paidPercent: counts.total > 0 ? Math.round((counts.paid / counts.total) * 100) : 0,
+      pendingPercent: counts.total > 0 ? Math.round((counts.pending / counts.total) * 100) : 0,
+      overduePercent: counts.total > 0 ? Math.round((counts.overdue / counts.total) * 100) : 0,
+    });
+  };
+
+  const getStatusBadge = (fee: Fee) => {
+    const isOverdue = new Date(fee.due_date) < new Date() && fee.status !== 'paid';
+    if (isOverdue) return <Badge className="bg-red-100 text-red-800">Overdue</Badge>;
+    switch (fee.status) {
+      case "paid": return <Badge className="bg-green-100 text-green-800">Paid</Badge>;
+      case "unpaid": return <Badge className="bg-yellow-100 text-yellow-800">Unpaid</Badge>;
+      case "partial": return <Badge className="bg-blue-100 text-blue-800">Partial</Badge>;
+      default: return <Badge>Unknown</Badge>;
+    }
+  };
+
+  const { paidFees, unpaidFees } = useMemo(() => {
+    const filtered = allFees.filter(fee => `${fee.student.user.first_name} ${fee.student.user.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()));
+    return {
+      paidFees: filtered.filter(f => f.status === 'paid'),
+      unpaidFees: filtered.filter(f => f.status !== 'paid').sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime()),
+    };
+  }, [allFees, searchTerm]);
+
+  const handleAddFee = async () => {
+    setIsSubmitting(true);
+    try {
+      const response = applyTo === 'student'
+        ? await api.fees.createFee(parseInt(feeFormData.target_id), parseFloat(feeFormData.amount), feeFormData.due_date)
+        : await api.fees.createClassFee(parseInt(feeFormData.target_id), parseFloat(feeFormData.amount), feeFormData.due_date);
+      if (response.success) {
+        toast({ title: "Success", description: response.data.message || "Fee action successful." });
+        setIsFeeDialogOpen(false);
+        fetchData();
+      } else { throw new Error(response.message); }
+    } catch (err: any) { toast({ variant: "destructive", title: "Error", description: err.message }); }
+    finally { setIsSubmitting(false); }
+  };
+
+  const handleSendReminders = async () => {
+    setIsSubmitting(true);
+    try {
+      const response = await api.fees.sendReminders();
+      if (response.success) toast({ title: "Success", description: response.data.message });
+      else throw new Error(response.message);
+    } catch (err: any) { toast({ variant: "destructive", title: "Error", description: err.message }); }
+    finally { setIsSubmitting(false); }
+  };
+
+  const handleGenerateReport = async () => {
+    try {
+      const response = await apiClient.get(`/fees/actions/?action=generate_report`);
+      if (response.success && typeof response.data === 'string') {
+        const newWindow = window.open();
+        newWindow?.document.write(response.data);
+        newWindow?.document.close();
+      } else { throw new Error(response.message || "Failed to generate report."); }
+    } catch (err: any) { toast({ variant: "destructive", title: "Error", description: err.message }); }
+  };
+
+  const handleExportData = () => {
+    let csvContent = "data:text/csv;charset=utf-8,Student Name,Class,Amount,Due Date,Status\n";
+    allFees.forEach(fee => {
+      const row = [`"${fee.student.user.first_name} ${fee.student.user.last_name}"`, fee.student.school_class, fee.amount, fee.due_date, fee.status].join(",");
+      csvContent += row + "\r\n";
+    });
+    const link = document.createElement("a");
+    link.href = encodeURI(csvContent);
+    link.download = "fee_export.csv";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  if (isLoading) return <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+  if (error) return <Card className="border-red-200 bg-red-50"><CardContent className="pt-4"><p className="text-red-700">{error}</p></CardContent></Card>;
+  if (userRole !== 'principal' && userRole !== 'student') return <Card><CardHeader><CardTitle>Access Denied</CardTitle></CardHeader></Card>;
+
+  if (userRole === 'student') {
     return (
       <div className="space-y-6">
-        <div>
-          <h3 className="text-lg font-medium">Fees Management</h3>
-          <p className="text-sm text-muted-foreground">Manage school fees and payment tracking</p>
-        </div>
-
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Collected</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">${mockFeeStats.totalCollected.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">This academic year</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pending Payments</CardTitle>
-              <AlertCircle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">${mockFeeStats.totalPending.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">Awaiting payment</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Overdue Amount</CardTitle>
-              <AlertCircle className="h-4 w-4 text-red-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">${mockFeeStats.totalOverdue.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">Past due date</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Collection Rate</CardTitle>
-              <CheckCircle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{mockFeeStats.collectionRate}%</div>
-              <p className="text-xs text-muted-foreground">Payment success rate</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="structure">Fee Structure</TabsTrigger>
-            <TabsTrigger value="students">Student Fees</TabsTrigger>
-            <TabsTrigger value="reports">Reports</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="overview" className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Payment Status Distribution</CardTitle>
-                  <CardDescription>Overview of payment statuses</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm">Paid</span>
-                      <span className="text-sm font-medium">65%</span>
-                    </div>
-                    <Progress value={65} className="h-2" />
-                  </div>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm">Pending</span>
-                      <span className="text-sm font-medium">25%</span>
-                    </div>
-                    <Progress value={25} className="h-2" />
-                  </div>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm">Overdue</span>
-                      <span className="text-sm font-medium">10%</span>
-                    </div>
-                    <Progress value={10} className="h-2" />
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Quick Actions</CardTitle>
-                  <CardDescription>Common fee management tasks</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 gap-4">
-                    <Button variant="outline" className="h-20 flex-col bg-transparent">
-                      <Plus className="h-6 w-6 mb-2" />
-                      Add Fee Type
-                    </Button>
-                    <Button variant="outline" className="h-20 flex-col bg-transparent">
-                      <Send className="h-6 w-6 mb-2" />
-                      Send Reminders
-                    </Button>
-                    <Button variant="outline" className="h-20 flex-col bg-transparent">
-                      <FileText className="h-6 w-6 mb-2" />
-                      Generate Report
-                    </Button>
-                    <Button variant="outline" className="h-20 flex-col bg-transparent">
-                      <Download className="h-6 w-6 mb-2" />
-                      Export Data
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="structure" className="space-y-4">
-            <div className="flex justify-between items-center">
-              <div>
-                <h4 className="text-lg font-medium">Fee Structure</h4>
-                <p className="text-sm text-muted-foreground">Manage fee types and amounts</p>
-              </div>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Fee Type
-              </Button>
-            </div>
-
-            <Card>
-              <CardContent className="p-0">
-                <div className="space-y-0">
-                  {mockFeeStructure.map((fee, index) => (
-                    <div key={fee.id} className={`p-4 ${index !== mockFeeStructure.length - 1 ? "border-b" : ""}`}>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-4">
-                          <div>
-                            <p className="font-medium">{fee.name}</p>
-                            <p className="text-sm text-muted-foreground">{fee.frequency}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-4">
-                          <Badge className={getCategoryColor(fee.category)}>{fee.category}</Badge>
-                          <div className="text-right">
-                            <p className="font-medium">${fee.amount}</p>
-                          </div>
-                          <Button variant="outline" size="sm">
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="students" className="space-y-4">
-            <div>
-              <h4 className="text-lg font-medium">Student Fee Status</h4>
-              <p className="text-sm text-muted-foreground">Track individual student payments</p>
-            </div>
-
-            <Card>
-              <CardContent className="p-0">
-                <div className="space-y-0">
-                  {mockStudentFees.map((student, index) => (
-                    <div key={student.id} className={`p-4 ${index !== mockStudentFees.length - 1 ? "border-b" : ""}`}>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-4">
-                          <Avatar>
-                            <AvatarImage src={`/diverse-student.png?height=40&width=40&query=student-${student.id}`} />
-                            <AvatarFallback>
-                              {student.studentName
-                                .split(" ")
-                                .map((n) => n[0])
-                                .join("")}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="font-medium">{student.studentName}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {student.studentId} • Class {student.class}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-4">
-                          <div className="text-right">
-                            <p className="text-sm font-medium">
-                              ${student.totalPaid} / ${student.totalDue}
-                            </p>
-                            <p className="text-xs text-muted-foreground">Due: {student.dueDate}</p>
-                          </div>
-                          <Badge className={getStatusColor(student.status)}>{student.status}</Badge>
-                          <Button variant="outline" size="sm">
-                            <Eye className="h-4 w-4 mr-1" />
-                            View
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="reports" className="space-y-4">
-            <div>
-              <h4 className="text-lg font-medium">Fee Reports</h4>
-              <p className="text-sm text-muted-foreground">Generate comprehensive fee reports</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Collection Reports</CardTitle>
-                  <CardDescription>Payment collection analytics</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <Button variant="outline" className="w-full justify-start bg-transparent">
-                    <FileText className="h-4 w-4 mr-2" />
-                    Monthly Collection Report
-                  </Button>
-                  <Button variant="outline" className="w-full justify-start bg-transparent">
-                    <Users className="h-4 w-4 mr-2" />
-                    Student-wise Fee Status
-                  </Button>
-                  <Button variant="outline" className="w-full justify-start bg-transparent">
-                    <AlertCircle className="h-4 w-4 mr-2" />
-                    Overdue Payments Report
-                  </Button>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Financial Reports</CardTitle>
-                  <CardDescription>Financial analysis and projections</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <Button variant="outline" className="w-full justify-start bg-transparent">
-                    <DollarSign className="h-4 w-4 mr-2" />
-                    Revenue Analysis
-                  </Button>
-                  <Button variant="outline" className="w-full justify-start bg-transparent">
-                    <Calendar className="h-4 w-4 mr-2" />
-                    Quarterly Summary
-                  </Button>
-                  <Button variant="outline" className="w-full justify-start bg-transparent">
-                    <Download className="h-4 w-4 mr-2" />
-                    Export All Data
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-        </Tabs>
-      </div>
-    )
-  }
-
-  // Teacher view - limited fees access
-  if (userRole === "teacher") {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h3 className="text-lg font-medium">Student Fees</h3>
-          <p className="text-sm text-muted-foreground">View fee status for students in your classes</p>
-        </div>
-
         <Card>
           <CardHeader>
-            <CardTitle>My Students' Fee Status</CardTitle>
-            <CardDescription>Fee payment status for students in your classes</CardDescription>
+            <CardTitle>My Fees</CardTitle>
+            <CardDescription>View your fee payment status and history</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {mockStudentFees.slice(0, 3).map((student) => (
-                <div key={student.id} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex items-center space-x-4">
-                    <Avatar>
-                      <AvatarImage src={`/diverse-student.png?height=40&width=40&query=student-${student.id}`} />
-                      <AvatarFallback>
-                        {student.studentName
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("")}
-                      </AvatarFallback>
-                    </Avatar>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card className="border-blue-200">
+                  <CardContent className="pt-4">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-blue-600">$2,500</div>
+                      <p className="text-sm text-muted-foreground">Total Fees</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="border-green-200">
+                  <CardContent className="pt-4">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-green-600">$1,800</div>
+                      <p className="text-sm text-muted-foreground">Paid</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="border-yellow-200">
+                  <CardContent className="pt-4">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-yellow-600">$700</div>
+                      <p className="text-sm text-muted-foreground">Pending</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-lg font-medium">Recent Fee Records</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center p-3 border rounded-lg">
                     <div>
-                      <p className="font-medium">{student.studentName}</p>
-                      <p className="text-sm text-muted-foreground">Class {student.class}</p>
+                      <p className="font-medium">Tuition Fee - September</p>
+                      <p className="text-sm text-muted-foreground">Due: Sep 30, 2025</p>
                     </div>
+                    <Badge className="bg-green-100 text-green-800">Paid</Badge>
                   </div>
-                  <div className="flex items-center space-x-4">
-                    <div className="text-right">
-                      <p className="text-sm font-medium">
-                        ${student.totalPaid} / ${student.totalDue}
-                      </p>
-                      <p className="text-xs text-muted-foreground">Due: {student.dueDate}</p>
+                  <div className="flex justify-between items-center p-3 border rounded-lg">
+                    <div>
+                      <p className="font-medium">Library Fee</p>
+                      <p className="text-sm text-muted-foreground">Due: Oct 15, 2025</p>
                     </div>
-                    <Badge className={getStatusColor(student.status)}>{student.status}</Badge>
+                    <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>
                   </div>
                 </div>
-              ))}
+              </div>
             </div>
           </CardContent>
         </Card>
       </div>
-    )
+    );
   }
 
-  // Student view - personal fees
   return (
     <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-medium">My Fees</h3>
-        <p className="text-sm text-muted-foreground">View and manage your fee payments</p>
-      </div>
+      <Dialog open={isFeeDialogOpen} onOpenChange={setIsFeeDialogOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Add New Fee</DialogTitle><DialogDescription>Create a new fee record for a student or an entire class.</DialogDescription></DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="space-y-2"><Label>Apply To</Label>
+              <Select onValueChange={(v) => { setApplyTo(v as any); setFeeFormData(p => ({...p, target_id: ''}))}} defaultValue="student">
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="student">A Single Student</SelectItem><SelectItem value="class">An Entire Class</SelectItem></SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2"><Label>{applyTo === 'student' ? 'Student' : 'Class'}</Label>
+              {applyTo === 'student' ? (
+                <Select onValueChange={(v) => setFeeFormData(p => ({...p, target_id: v}))}><SelectTrigger><SelectValue placeholder="Select a student" /></SelectTrigger>
+                  <SelectContent>{students.map(s => <SelectItem key={s.user.id} value={s.user.id.toString()}>{s.user.first_name} {s.user.last_name}</SelectItem>)}</SelectContent>
+                </Select>
+              ) : (
+                <Select onValueChange={(v) => setFeeFormData(p => ({...p, target_id: v}))}><SelectTrigger><SelectValue placeholder="Select a class" /></SelectTrigger>
+                  <SelectContent>{classes.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}</SelectContent>
+                </Select>
+              )}
+            </div>
+            <div className="space-y-2"><Label>Amount ($)</Label><Input type="number" placeholder="e.g., 2500" value={feeFormData.amount} onChange={e => setFeeFormData(p => ({...p, amount: e.target.value}))} /></div>
+            <div className="space-y-2"><Label>Due Date</Label><Input type="date" value={feeFormData.due_date} onChange={e => setFeeFormData(p => ({...p, due_date: e.target.value}))} /></div>
+          </div>
+          <DialogFooter><Button onClick={handleAddFee} disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Create Fee</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      {/* Student Fee Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Due</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">$1,350</div>
-            <p className="text-xs text-muted-foreground">Current semester</p>
-          </CardContent>
-        </Card>
+      {feeStats && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2"><CardTitle className="text-sm font-medium">Total Collected</CardTitle><DollarSign className="h-4 w-4 text-muted-foreground" /></CardHeader>
+            <CardContent><div className="text-2xl font-bold">${feeStats.totalCollected.toLocaleString()}</div><p className="text-xs text-muted-foreground">This academic year</p></CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2"><CardTitle className="text-sm font-medium">Pending Payments</CardTitle><AlertCircle className="h-4 w-4 text-muted-foreground" /></CardHeader>
+            <CardContent><div className="text-2xl font-bold">${feeStats.totalPending.toLocaleString()}</div><p className="text-xs text-muted-foreground">Awaiting payment</p></CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2"><CardTitle className="text-sm font-medium">Overdue Amount</CardTitle><AlertCircle className="h-4 w-4 text-red-500" /></CardHeader>
+            <CardContent><div className="text-2xl font-bold text-red-600">${feeStats.totalOverdue.toLocaleString()}</div><p className="text-xs text-muted-foreground">Past due date</p></CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2"><CardTitle className="text-sm font-medium">Collection Rate</CardTitle><CheckCircle className="h-4 w-4 text-muted-foreground" /></CardHeader>
+            <CardContent><div className="text-2xl font-bold">{feeStats.collectionRate}%</div><p className="text-xs text-muted-foreground">Payment success rate</p></CardContent>
+          </Card>
+        </div>
+      )}
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Paid</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">$2,500</div>
-            <p className="text-xs text-muted-foreground">This month</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Overdue</CardTitle>
-            <AlertCircle className="h-4 w-4 text-red-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">$400</div>
-            <p className="text-xs text-muted-foreground">Past due</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="current">Current Fees</TabsTrigger>
-          <TabsTrigger value="history">Payment History</TabsTrigger>
-          <TabsTrigger value="payment">Make Payment</TabsTrigger>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="structure">Fee Structure</TabsTrigger>
+          <TabsTrigger value="students">Student Fees</TabsTrigger>
+          <TabsTrigger value="reports">Reports</TabsTrigger>
         </TabsList>
-
-        <TabsContent value="current" className="space-y-4">
+        <TabsContent value="overview" className="space-y-4 pt-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader><CardTitle>Payment Status Distribution</CardTitle><CardDescription>Overview of payment statuses</CardDescription></CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2"><div className="flex justify-between items-center"><span className="text-sm">Paid</span><span className="text-sm font-medium">{distribution?.paidPercent}%</span></div><Progress value={distribution?.paidPercent} /></div>
+                <div className="space-y-2"><div className="flex justify-between items-center"><span className="text-sm">Pending</span><span className="text-sm font-medium">{distribution?.pendingPercent}%</span></div><Progress value={distribution?.pendingPercent} /></div>
+                <div className="space-y-2"><div className="flex justify-between items-center"><span className="text-sm">Overdue</span><span className="text-sm font-medium">{distribution?.overduePercent}%</span></div><Progress value={distribution?.overduePercent} /></div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle>Quick Actions</CardTitle><CardDescription>Common fee management tasks</CardDescription></CardHeader>
+              <CardContent className="grid grid-cols-2 gap-4">
+                <Button variant="outline" className="h-20 flex-col gap-2" onClick={() => setIsFeeDialogOpen(true)}><Plus className="h-6 w-6" /> Add Fee</Button>
+                <Button variant="outline" className="h-20 flex-col gap-2" onClick={handleSendReminders} disabled={isSubmitting}>{isSubmitting ? <Loader2 className="h-6 w-6 animate-spin"/> : <Send className="h-6 w-6" />} Send Reminders</Button>
+                <Button variant="outline" className="h-20 flex-col gap-2" onClick={handleGenerateReport}><FileText className="h-6 w-6" /> Generate Report</Button>
+                <Button variant="outline" className="h-20 flex-col gap-2" onClick={handleExportData}><Download className="h-6 w-6" /> Export Data</Button>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+        <TabsContent value="students" className="space-y-4 pt-4">
           <Card>
             <CardHeader>
-              <CardTitle>Outstanding Fees</CardTitle>
-              <CardDescription>Your current fee obligations</CardDescription>
+              <CardTitle>Student Fee Records</CardTitle>
+              <CardDescription>A directory of all fee records, separated by payment status.</CardDescription>
+              <div className="relative pt-4"><Search className="absolute left-2.5 top-6.5 h-4 w-4 text-muted-foreground" /><Input placeholder="Search by student name..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8 max-w-sm" /></div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {mockMyFees.map((fee) => (
-                  <div key={fee.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <p className="font-medium">{fee.feeName}</p>
-                      <p className="text-sm text-muted-foreground">Due: {fee.dueDate}</p>
-                    </div>
-                    <div className="flex items-center space-x-4">
-                      <Badge className={getCategoryColor(fee.category)}>{fee.category}</Badge>
-                      <div className="text-right">
-                        <p className="font-medium">${fee.amount}</p>
+              {unpaidFees.length === 0 && paidFees.length === 0 && searchTerm ? ( <div className="text-center text-muted-foreground py-12"><Search className="mx-auto h-12 w-12 text-gray-400" /><h3 className="mt-2 text-sm font-semibold">No Results Found</h3><p className="mt-1 text-sm">Your search for "{searchTerm}" did not match any fee records.</p></div> ) : (
+                <div className="space-y-8">
+                  <div>
+                    <h3 className="text-lg font-semibold border-b pb-2 mb-4">Pending & Overdue Fees ({unpaidFees.length})</h3>
+                    {unpaidFees.length > 0 ? (
+                      <div className="space-y-2">{unpaidFees.map((fee) => (
+                        <div key={fee.id} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div className="flex items-center gap-3"><Avatar><AvatarFallback>{fee.student.user.first_name?.[0]}{fee.student.user.last_name?.[0]}</AvatarFallback></Avatar><div><p className="font-medium">{fee.student.user.first_name} {fee.student.user.last_name}</p><p className="text-sm text-muted-foreground">Class {fee.student.school_class}</p></div></div>
+                          <div className="flex items-center gap-4"><div className="text-right"><p className="font-semibold">${parseFloat(fee.amount).toFixed(2)}</p><p className="text-xs text-muted-foreground">Due: {fee.due_date}</p></div>{getStatusBadge(fee)}</div>
+                        </div>))}
                       </div>
-                      <Badge className={getStatusColor(fee.status)}>{fee.status}</Badge>
-                      {fee.status !== "paid" && (
-                        <Button size="sm" variant="outline">
-                          <CreditCard className="h-4 w-4 mr-1" />
-                          Pay Now
-                        </Button>
-                      )}
-                    </div>
+                    ) : ( <p className="text-sm text-muted-foreground py-4 text-center">All pending fees are cleared!</p> )}
                   </div>
-                ))}
-              </div>
+                  <div>
+                    <h3 className="text-lg font-semibold border-b pb-2 mb-4">Cleared Fees ({paidFees.length})</h3>
+                    {paidFees.length > 0 ? (
+                      <div className="space-y-2">{paidFees.map((fee) => (
+                        <div key={fee.id} className="flex items-center justify-between p-3 border rounded-lg bg-muted/50">
+                          <div className="flex items-center gap-3"><Avatar><AvatarFallback>{fee.student.user.first_name?.[0]}{fee.student.user.last_name?.[0]}</AvatarFallback></Avatar><div><p className="font-medium text-muted-foreground">{fee.student.user.first_name} {fee.student.user.last_name}</p><p className="text-sm text-muted-foreground">Class {fee.student.school_class}</p></div></div>
+                          <div className="flex items-center gap-4"><div className="text-right"><p className="font-semibold text-muted-foreground">${parseFloat(fee.amount).toFixed(2)}</p><p className="text-xs text-muted-foreground">Due: {fee.due_date}</p></div>{getStatusBadge(fee)}</div>
+                        </div>))}
+                      </div>
+                    ) : ( <p className="text-sm text-muted-foreground py-4 text-center">No cleared fees match your search.</p> )}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
-
-        <TabsContent value="history" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Payment History</CardTitle>
-              <CardDescription>Your previous fee payments</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {mockPaymentHistory.map((payment) => (
-                  <div key={payment.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <p className="font-medium">{payment.description}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {payment.date} • {payment.method}
-                      </p>
-                    </div>
-                    <div className="flex items-center space-x-4">
-                      <div className="text-right">
-                        <p className="font-medium">${payment.amount}</p>
-                      </div>
-                      <Badge className={getStatusColor(payment.status)}>{payment.status}</Badge>
-                      <Button size="sm" variant="outline">
-                        <Download className="h-4 w-4 mr-1" />
-                        Receipt
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+        <TabsContent value="structure" className="pt-4">
+            <FeeStructureManagement />
         </TabsContent>
-
-        <TabsContent value="payment" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Make Payment</CardTitle>
-              <CardDescription>Pay your outstanding fees online</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="amount">Amount</Label>
-                  <Input id="amount" placeholder="Enter amount" />
-                </div>
-                <div>
-                  <Label htmlFor="method">Payment Method</Label>
-                  <Input id="method" placeholder="Credit Card" />
-                </div>
-              </div>
-              <div className="flex space-x-4">
-                <Button className="flex-1">
-                  <CreditCard className="h-4 w-4 mr-2" />
-                  Pay with Card
-                </Button>
-                <Button variant="outline" className="flex-1 bg-transparent">
-                  <DollarSign className="h-4 w-4 mr-2" />
-                  Bank Transfer
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+        <TabsContent value="reports" className="pt-4">
+            <FeeReportDashboard />
         </TabsContent>
       </Tabs>
     </div>

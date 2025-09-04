@@ -7,10 +7,33 @@ import { TeacherDashboard } from "@/components/teacher-dashboard"
 import { StudentDashboard } from "@/components/student-dashboard"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { LogOut, GraduationCap } from "lucide-react"
+import { LogOut, GraduationCap, Heart } from "lucide-react"
+import { api } from "@/lib/api"
+import { useToast } from "@/hooks/use-toast"
 
 function Dashboard() {
   const { user, logout } = useAuth()
+  const { toast } = useToast()
+
+  const handleHealthCheck = async () => {
+    try {
+      const response = await api.health.check()
+      if (response.success) {
+        toast({
+          title: "Health Check Successful",
+          description: (response.data as any)?.message || "Server is running smoothly!",
+        })
+      } else {
+        throw new Error(response.message)
+      }
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Health Check Failed",
+        description: error.message || "Unable to connect to server.",
+      })
+    }
+  }
 
   if (!user) return null
 
@@ -43,36 +66,38 @@ function Dashboard() {
             </div>
 
             <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-3">
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name || "User"} />
-                  <AvatarFallback>
-                    {user.name
-                      ? user.name
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("")
-                      : "U"}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="hidden sm:block">
-                  <div className="text-sm font-medium text-gray-900">{user.name || "User"}</div>
-                  <div className="text-xs text-gray-500">{user.email || "No email"}</div>
-                </div>
-              </div>
+               <div className="flex items-center space-x-3">
+                 <Avatar className="h-8 w-8">
+                   <AvatarImage src="/placeholder.svg" alt={`${user.first_name} ${user.last_name}` || "User"} />
+                   <AvatarFallback>
+                     {user.first_name && user.last_name
+                       ? `${user.first_name[0]}${user.last_name[0]}`
+                       : "U"}
+                   </AvatarFallback>
+                 </Avatar>
+                 <div className="hidden sm:block">
+                   <div className="text-sm font-medium text-gray-900">{`${user.first_name} ${user.last_name}` || "User"}</div>
+                   <div className="text-xs text-gray-500">{user.email || "No email"}</div>
+                 </div>
+               </div>
 
-              <Button variant="outline" size="sm" onClick={logout}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
-              </Button>
-            </div>
+               <Button variant="enhanced" size="sm" onClick={handleHealthCheck}>
+                 <Heart className="h-4 w-4 mr-2" />
+                 Health Check
+               </Button>
+
+               <Button variant="outline" size="sm" onClick={logout}>
+                 <LogOut className="h-4 w-4 mr-2" />
+                 Logout
+               </Button>
+             </div>
           </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <h2 className="text-2xl font-bold text-gray-900">Hello, {user.name || "User"}!</h2>
+          <h2 className="text-2xl font-bold text-gray-900">Hello, {`${user.first_name} ${user.last_name}` || "User"}!</h2>
           <p className="text-gray-600 mt-1">
             {user.role === "principal" && "Welcome to your administrative dashboard"}
             {user.role === "teacher" && "Welcome to your teaching dashboard"}

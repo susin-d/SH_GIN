@@ -1,6 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useAuth } from "@/lib/auth-context"
+import { api, apiClient } from "@/lib/api"
+import { useToast } from "@/hooks/use-toast"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -19,223 +22,248 @@ import {
   Edit,
   Send,
   Loader2,
+  Heart,
 } from "lucide-react"
 import { LeaveManagement } from "./leave-management"
 import { TimetableManagement } from "./timetable-management"
 import { FeesManagement } from "./fees-management"
-import { api } from "@/lib/api"
 
-interface TeacherStats {
-  totalClasses: number
-  totalStudents: number
-  todayClasses: number
-  pendingGrades: number
-  attendanceRate: number
-  upcomingDeadlines: number
-}
-
-interface ClassItem {
+// --- TypeScript Interfaces for API Data ---
+interface SchoolClass {
   id: number
   name: string
-  students: number
-  time: string
-  room: string
-  attendance: number
+  students: any[] // The backend `SchoolClass` model doesn't have a direct students field, so this might be empty
 }
 
-interface Student {
-  id: number
-  name?: string
-  first_name?: string
-  last_name?: string
-  class?: string
-  grade?: string
-  attendance?: number
-  lastAssignment?: string
-  score?: number
+interface StudentFromAPI {
+  user: {
+    id: number
+    first_name: string
+    last_name: string
+  }
+  school_class: string
 }
 
-interface Assignment {
-  id: number
-  title: string
-  class: string
-  dueDate: string
-  submitted: number
-  total: number
-  status: string
+interface TeacherStats {
+  total_classes: number
+  total_students: number
 }
-
-interface ScheduleItem {
-  time: string
-  class: string
-  room: string
-  duration: string
-}
-
-// Mock data fallbacks
-const mockTeacherStats: TeacherStats = {
-  totalClasses: 6,
-  totalStudents: 180,
-  todayClasses: 4,
-  pendingGrades: 23,
-  attendanceRate: 91.5,
-  upcomingDeadlines: 3,
-}
-
-const mockClasses: ClassItem[] = [
-  { id: 1, name: "Mathematics 10-A", students: 32, time: "09:00 AM", room: "Room 101", attendance: 94 },
-  { id: 2, name: "Mathematics 10-B", students: 28, time: "10:30 AM", room: "Room 101", attendance: 89 },
-  { id: 3, name: "Advanced Math 11-A", students: 25, time: "01:00 PM", room: "Room 102", attendance: 96 },
-  { id: 4, name: "Calculus 12-A", students: 22, time: "02:30 PM", room: "Room 102", attendance: 92 },
-]
-
-const mockStudents: Student[] = [
-  {
-    id: 1,
-    name: "Alice Johnson",
-    class: "10-A",
-    grade: "A",
-    attendance: 96,
-    lastAssignment: "Algebra Quiz",
-    score: 92,
-  },
-  { id: 2, name: "Bob Smith", class: "10-A", grade: "B+", attendance: 89, lastAssignment: "Algebra Quiz", score: 85 },
-  {
-    id: 3,
-    name: "Carol Davis",
-    class: "10-B",
-    grade: "A-",
-    attendance: 92,
-    lastAssignment: "Geometry Test",
-    score: 88,
-  },
-  { id: 4, name: "David Wilson", class: "11-A", grade: "B", attendance: 87, lastAssignment: "Trigonometry", score: 78 },
-]
-
-const mockAssignments: Assignment[] = [
-  {
-    id: 1,
-    title: "Quadratic Equations Test",
-    class: "10-A",
-    dueDate: "2024-01-15",
-    submitted: 28,
-    total: 32,
-    status: "active",
-  },
-  {
-    id: 2,
-    title: "Geometry Homework",
-    class: "10-B",
-    dueDate: "2024-01-12",
-    submitted: 25,
-    total: 28,
-    status: "grading",
-  },
-  {
-    id: 3,
-    title: "Calculus Project",
-    class: "12-A",
-    dueDate: "2024-01-20",
-    submitted: 18,
-    total: 22,
-    status: "active",
-  },
-]
-
-const mockSchedule: ScheduleItem[] = [
-  { time: "09:00 AM", class: "Mathematics 10-A", room: "Room 101", duration: "50 min" },
-  { time: "10:30 AM", class: "Mathematics 10-B", room: "Room 101", duration: "50 min" },
-  { time: "01:00 PM", class: "Advanced Math 11-A", room: "Room 102", duration: "50 min" },
-  { time: "02:30 PM", class: "Calculus 12-A", room: "Room 102", duration: "50 min" },
-]
 
 export function TeacherDashboard() {
-  const [activeTab, setActiveTab] = useState("overview")
-  const [stats, setStats] = useState<TeacherStats>(mockTeacherStats)
-  const [classes, setClasses] = useState<ClassItem[]>(mockClasses)
-  const [students, setStudents] = useState<Student[]>(mockStudents)
-  const [assignments, setAssignments] = useState<Assignment[]>(mockAssignments)
-  const [schedule, setSchedule] = useState<ScheduleItem[]>(mockSchedule)
+  const { user: currentUser } = useAuth()
+  const { toast } = useToast()
+  const [activeTab, setActiveTab] = useState("classes")
+
+  const handleHealthCheck = async () => {
+    try {
+      const response = await api.health.check()
+      if (response.success) {
+        toast({
+          title: "Health Check Successful",
+          description: (response.data as any)?.message || "Server is running smoothly!",
+        })
+      } else {
+        throw new Error(response.message)
+      }
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Health Check Failed",
+        description: error.message || "Unable to connect to server.",
+      })
+    }
+  }
+
+  const handleViewClassDetails = async (classId: number) => {
+    try {
+      const response = await api.classes.details(classId)
+      if (response.success) {
+        const data = response.data as any
+        toast({
+          title: "Class Details",
+          description: `Class has ${data.total_students} students taught by ${data.teacher?.first_name || 'Unknown'}`,
+        })
+      } else {
+        throw new Error(response.message)
+      }
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to load class details.",
+      })
+    }
+  }
+
+  const handleViewStudentDetails = async (studentId: number) => {
+    try {
+      const response = await api.students.details(studentId)
+      if (response.success) {
+        const data = response.data as any
+        const student = data.student
+        toast({
+          title: "Student Details",
+          description: `${student.user.first_name} ${student.user.last_name} - Attendance: ${data.attendance_rate}%`,
+        })
+      } else {
+        throw new Error(response.message)
+      }
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to load student details.",
+      })
+    }
+  }
+
+  const handleMarkTaskCompleted = async (taskId: number) => {
+    try {
+      const response = await api.tasks.markCompleted(taskId)
+      if (response.success) {
+        toast({
+          title: "Task Completed",
+          description: "Task has been marked as completed!",
+        })
+        // Refresh tasks
+        const tasksRes = await api.tasks.list()
+        const todayTasksRes = await api.tasks.todayTasks()
+        if (tasksRes.success) setTasks(tasksRes.data)
+        if (todayTasksRes.success) setTodayTasks(todayTasksRes.data)
+      } else {
+        throw new Error(response.message)
+      }
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to update task.",
+      })
+    }
+  }
+
+  const handleMarkTaskInProgress = async (taskId: number) => {
+    try {
+      const response = await api.tasks.markInProgress(taskId)
+      if (response.success) {
+        toast({
+          title: "Task Updated",
+          description: "Task has been marked as in progress!",
+        })
+        // Refresh tasks
+        const tasksRes = await api.tasks.list()
+        const todayTasksRes = await api.tasks.todayTasks()
+        if (tasksRes.success) setTasks(tasksRes.data as any[])
+        if (todayTasksRes.success) setTodayTasks(todayTasksRes.data as any[])
+      } else {
+        throw new Error(response.message)
+      }
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to update task.",
+      })
+    }
+  }
+
+  // --- State for Live API Data ---
+  const [stats, setStats] = useState<TeacherStats | null>(null)
+  const [classes, setClasses] = useState<SchoolClass[]>([])
+  const [students, setStudents] = useState<StudentFromAPI[]>([])
+  const [tasks, setTasks] = useState<any[]>([])
+  const [todayTasks, setTodayTasks] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (!currentUser) {
+      setIsLoading(false)
+      return
+    }
+
     const fetchTeacherData = async () => {
       setIsLoading(true)
       setError(null)
-
       try {
-        const statsResponse = await api.get("/teacher/dashboard/stats/")
-        if (statsResponse.success && statsResponse.data) {
-          setStats(statsResponse.data)
+        // Fetch all required data in parallel for performance
+        const [classesRes, studentsRes, tasksRes, todayTasksRes] = await Promise.all([
+          api.teachers.classes(currentUser.id),
+          apiClient.get(`/teachers/${currentUser.id}/students/`),
+          api.tasks.list(),
+          api.tasks.todayTasks(),
+        ])
+
+        if (classesRes.success && Array.isArray(classesRes.data)) {
+          setClasses(classesRes.data)
+        } else {
+          throw new Error(classesRes.message || "Failed to fetch your classes.")
         }
 
-        // Fetch teacher's classes
-        const classesResponse = await api.get("/teacher/classes/")
-        if (classesResponse.success && classesResponse.data) {
-          const formattedClasses = classesResponse.data.map((cls: any) => ({
-            ...cls,
-            attendance: cls.attendance || Math.floor(Math.random() * 20) + 80, // Fallback
-          }))
-          setClasses(formattedClasses)
+        if (studentsRes.success && Array.isArray(studentsRes.data)) {
+          setStudents(studentsRes.data)
+        } else {
+          // It's possible a teacher has no students yet, so don't throw an error, just warn.
+          console.warn(studentsRes.message || "Could not fetch students for this teacher.")
+          setStudents([])
         }
 
-        // Fetch teacher's students
-        const studentsResponse = await api.get("/teacher/students/")
-        if (studentsResponse.success && studentsResponse.data) {
-          const formattedStudents = studentsResponse.data.map((student: any) => ({
-            ...student,
-            name: student.name || `${student.first_name || ""} ${student.last_name || ""}`.trim(),
-            attendance: student.attendance || Math.floor(Math.random() * 20) + 80, // Fallback
-            score: student.score || Math.floor(Math.random() * 30) + 70, // Fallback
-          }))
-          setStudents(formattedStudents)
+        if (tasksRes.success && Array.isArray(tasksRes.data)) {
+          setTasks(tasksRes.data as any[])
         }
 
-        // Fetch teacher's assignments
-        const assignmentsResponse = await api.get("/teacher/assignments/")
-        if (assignmentsResponse.success && assignmentsResponse.data) {
-          setAssignments(assignmentsResponse.data)
+        if (todayTasksRes.success && Array.isArray(todayTasksRes.data)) {
+          setTodayTasks(todayTasksRes.data as any[])
         }
 
-        // Fetch teacher's schedule
-        const scheduleResponse = await api.get("/teacher/schedule/")
-        if (scheduleResponse.success && scheduleResponse.data) {
-          setSchedule(scheduleResponse.data)
-        }
-      } catch (error) {
-        console.error("Failed to fetch teacher dashboard data:", error)
-        setError("Failed to load dashboard data. Using offline data.")
-        // Keep mock data as fallback
+        // Calculate stats based on the fetched data
+        const totalStudents = Array.isArray(studentsRes.data) ? studentsRes.data.length : 0
+        setStats({
+          total_classes: Array.isArray(classesRes.data) ? classesRes.data.length : 0,
+          total_students: totalStudents,
+        })
+      } catch (err: any) {
+        setError(err.message || "An unexpected error occurred while loading your dashboard.")
+        console.error(err)
       } finally {
         setIsLoading(false)
       }
     }
 
     fetchTeacherData()
-  }, [])
+  }, [currentUser])
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin" />
-        <span className="ml-2">Loading dashboard...</span>
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <span className="ml-2">Loading Your Dashboard...</span>
       </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <Card className="border-red-200 bg-red-50">
+        <CardContent className="pt-4">
+          <div className="flex items-center space-x-2">
+            <AlertCircle className="h-4 w-4 text-red-600" />
+            <p className="text-sm text-red-800">{error}</p>
+          </div>
+        </CardContent>
+      </Card>
     )
   }
 
   return (
     <div className="space-y-6">
-      {error && (
-        <Card className="border-yellow-200 bg-yellow-50">
-          <CardContent className="pt-4">
-            <div className="flex items-center space-x-2">
-              <AlertCircle className="h-4 w-4 text-yellow-600" />
-              <p className="text-sm text-yellow-800">{error}</p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Health Check Button */}
+      <div className="flex justify-end">
+        <Button variant="enhanced" size="sm" onClick={handleHealthCheck}>
+          <Heart className="h-4 w-4 mr-2" />
+          Health Check
+        </Button>
+      </div>
 
       {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -245,161 +273,64 @@ export function TeacherDashboard() {
             <BookOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.totalClasses}</div>
-            <p className="text-xs text-muted-foreground">{stats.todayClasses} classes today</p>
+            <div className="text-2xl font-bold">{stats?.total_classes ?? "N/A"}</div>
+            <p className="text-xs text-muted-foreground">Total assigned classes</p>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Students</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.totalStudents}</div>
-            <p className="text-xs text-muted-foreground">Across all classes</p>
+            <div className="text-2xl font-bold">{stats?.total_students ?? "N/A"}</div>
+            <p className="text-xs text-muted-foreground">Across all your classes</p>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Attendance Rate</CardTitle>
             <BarChart3 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.attendanceRate}%</div>
-            <p className="text-xs text-muted-foreground">Average across classes</p>
+            <div className="text-2xl font-bold">91.5%</div>
+            <p className="text-xs text-muted-foreground">(Demo Data)</p>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Pending Tasks</CardTitle>
             <AlertCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.pendingGrades}</div>
-            <p className="text-xs text-muted-foreground">Assignments to grade</p>
+            <div className="text-2xl font-bold">{todayTasks.filter((task: any) => task.status === 'pending').length}</div>
+            <p className="text-xs text-muted-foreground">Due today</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Main Content Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-7">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-4 md:grid-cols-6">
           <TabsTrigger value="classes">My Classes</TabsTrigger>
           <TabsTrigger value="students">Students</TabsTrigger>
+          <TabsTrigger value="tasks">Tasks</TabsTrigger>
           <TabsTrigger value="assignments">Assignments</TabsTrigger>
-          <TabsTrigger value="fees">Student Fees</TabsTrigger>
-          <TabsTrigger value="leave">Leave Requests</TabsTrigger>
+          <TabsTrigger value="leave">My Leave</TabsTrigger>
           <TabsTrigger value="timetable">My Schedule</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Today's Schedule */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Today&apos;s Schedule</CardTitle>
-                <CardDescription>Your classes for today</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {schedule.map((item, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <div className="flex-shrink-0">
-                        <Clock className="h-5 w-5 text-blue-500" />
-                      </div>
-                      <div>
-                        <p className="font-medium">{item.class}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {item.room} • {item.duration}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium">{item.time}</p>
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            {/* Quick Actions */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Quick Actions</CardTitle>
-                <CardDescription>Common teaching tasks</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-4">
-                  <Button variant="outline" className="h-20 flex-col bg-transparent">
-                    <CheckCircle className="h-6 w-6 mb-2" />
-                    Take Attendance
-                  </Button>
-                  <Button variant="outline" className="h-20 flex-col bg-transparent">
-                    <Plus className="h-6 w-6 mb-2" />
-                    New Assignment
-                  </Button>
-                  <Button variant="outline" className="h-20 flex-col bg-transparent">
-                    <Edit className="h-6 w-6 mb-2" />
-                    Grade Papers
-                  </Button>
-                  <Button variant="outline" className="h-20 flex-col bg-transparent">
-                    <Send className="h-6 w-6 mb-2" />
-                    Send Message
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
         <TabsContent value="classes" className="space-y-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <h3 className="text-lg font-medium">My Classes</h3>
-              <p className="text-sm text-muted-foreground">Manage your assigned classes</p>
-            </div>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Assignment
-            </Button>
-          </div>
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {classes.map((classItem) => (
               <Card key={classItem.id}>
                 <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="text-lg">{classItem.name}</CardTitle>
-                      <CardDescription>
-                        {classItem.students} students • {classItem.room}
-                      </CardDescription>
-                    </div>
-                    <Badge variant="outline">{classItem.time}</Badge>
-                  </div>
+                  <CardTitle className="text-lg">{classItem.name}</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <div className="flex justify-between text-sm mb-2">
-                      <span>Attendance Rate</span>
-                      <span>{classItem.attendance}%</span>
-                    </div>
-                    <Progress value={classItem.attendance} className="h-2" />
-                  </div>
-                  <div className="flex space-x-2">
-                    <Button size="sm" variant="outline" className="flex-1 bg-transparent">
-                      <CheckCircle className="h-4 w-4 mr-1" />
-                      Attendance
+                <CardContent>
+                  <Button size="sm" variant="outline" className="w-full" onClick={() => handleViewClassDetails(classItem.id)}>
+                      <FileText className="h-4 w-4 mr-2" /> View Class Details
                     </Button>
-                    <Button size="sm" variant="outline" className="flex-1 bg-transparent">
-                      <FileText className="h-4 w-4 mr-1" />
-                      Grades
-                    </Button>
-                  </div>
                 </CardContent>
               </Card>
             ))}
@@ -407,56 +338,29 @@ export function TeacherDashboard() {
         </TabsContent>
 
         <TabsContent value="students" className="space-y-4">
-          <div>
-            <h3 className="text-lg font-medium">My Students</h3>
-            <p className="text-sm text-muted-foreground">View and manage student performance</p>
-          </div>
-
           <Card>
             <CardHeader>
-              <CardTitle>Student Performance</CardTitle>
-              <CardDescription>Overview of student grades and attendance</CardDescription>
+              <CardTitle>My Students</CardTitle>
+              <CardDescription>
+                An overview of all {students.length} students in your classes.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 {students.map((student) => (
-                  <div key={student.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div key={student.user.id} className="flex items-center justify-between p-4 border rounded-lg">
                     <div className="flex items-center space-x-4">
                       <Avatar>
-                        <AvatarImage
-                          src={`/diverse-student-portrait.png?height=40&width=40&query=student-portrait-${student.id}`}
-                        />
                         <AvatarFallback>
-                          {(student.name || `${student.first_name || ""} ${student.last_name || ""}`)
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")}
+                          {student.user.first_name?.[0]}{student.user.last_name?.[0]}
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <p className="font-medium">
-                          {student.name || `${student.first_name || ""} ${student.last_name || ""}`}
-                        </p>
-                        <p className="text-sm text-muted-foreground">Class {student.class}</p>
+                        <p className="font-medium">{student.user.first_name} {student.user.last_name}</p>
+                        <p className="text-sm text-muted-foreground">Class {student.school_class}</p>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-6">
-                      <div className="text-center">
-                        <p className="text-sm font-medium">Grade</p>
-                        <Badge variant="outline">{student.grade}</Badge>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-sm font-medium">Attendance</p>
-                        <p className="text-sm text-muted-foreground">{student.attendance}%</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-sm font-medium">Last Score</p>
-                        <p className="text-sm text-muted-foreground">{student.score}%</p>
-                      </div>
-                      <Button variant="outline" size="sm">
-                        View Details
-                      </Button>
-                    </div>
+                    <Button variant="outline" size="sm" onClick={() => handleViewStudentDetails(student.user.id)}>View Details</Button>
                   </div>
                 ))}
               </div>
@@ -464,73 +368,115 @@ export function TeacherDashboard() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="assignments" className="space-y-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <h3 className="text-lg font-medium">Assignments</h3>
-              <p className="text-sm text-muted-foreground">Manage assignments and grading</p>
-            </div>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Create Assignment
-            </Button>
-          </div>
+        <TabsContent value="tasks" className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Today's Tasks</CardTitle>
+                <CardDescription>
+                  Tasks scheduled for today ({todayTasks.length} tasks)
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {todayTasks.length > 0 ? (
+                    todayTasks.map((task: any) => (
+                      <div key={task.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex-1">
+                          <p className="font-medium">{task.title}</p>
+                          <p className="text-sm text-muted-foreground">{task.description}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge variant={task.priority === 'urgent' ? 'destructive' : task.priority === 'high' ? 'secondary' : 'outline'}>
+                              {task.priority_display}
+                            </Badge>
+                            <Badge variant="outline">{task.task_type_display}</Badge>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          {task.status === 'pending' && (
+                            <Button size="sm" variant="outline" onClick={() => handleMarkTaskInProgress(task.id)}>
+                              Start
+                            </Button>
+                          )}
+                          {task.status !== 'completed' && (
+                            <Button size="sm" variant="enhanced" onClick={() => handleMarkTaskCompleted(task.id)}>
+                              Complete
+                            </Button>
+                          )}
+                          {task.status === 'completed' && (
+                            <Badge className="bg-green-100 text-green-800">Completed</Badge>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-center text-muted-foreground py-8">No tasks for today! 🎉</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
 
-          <div className="space-y-4">
-            {assignments.map((assignment) => (
-              <Card key={assignment.id}>
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="text-lg">{assignment.title}</CardTitle>
-                      <CardDescription>
-                        Class: {assignment.class} • Due: {assignment.dueDate}
-                      </CardDescription>
-                    </div>
-                    <Badge variant={assignment.status === "active" ? "default" : "secondary"}>
-                      {assignment.status}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      <div>
-                        <p className="text-sm font-medium">Submissions</p>
-                        <p className="text-sm text-muted-foreground">
-                          {assignment.submitted} of {assignment.total} students
-                        </p>
+            <Card>
+              <CardHeader>
+                <CardTitle>All Tasks</CardTitle>
+                <CardDescription>
+                  Overview of all your tasks ({tasks.length} total)
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {tasks.length > 0 ? (
+                    tasks.map((task: any) => (
+                      <div key={task.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex-1">
+                          <p className="font-medium">{task.title}</p>
+                          <p className="text-sm text-muted-foreground">Due: {task.due_date}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge variant={task.status === 'completed' ? 'default' : task.status === 'in_progress' ? 'secondary' : 'outline'}>
+                              {task.status_display}
+                            </Badge>
+                            <Badge variant={task.priority === 'urgent' ? 'destructive' : task.priority === 'high' ? 'secondary' : 'outline'}>
+                              {task.priority_display}
+                            </Badge>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          {task.status === 'pending' && (
+                            <Button size="sm" variant="outline" onClick={() => handleMarkTaskInProgress(task.id)}>
+                              Start
+                            </Button>
+                          )}
+                          {task.status !== 'completed' && (
+                            <Button size="sm" variant="enhanced" onClick={() => handleMarkTaskCompleted(task.id)}>
+                              Complete
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                      <div className="w-32">
-                        <Progress value={(assignment.submitted / assignment.total) * 100} className="h-2" />
-                      </div>
-                    </div>
-                    <div className="flex space-x-2">
-                      <Button variant="outline" size="sm">
-                        <Edit className="h-4 w-4 mr-1" />
-                        Grade
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        <FileText className="h-4 w-4 mr-1" />
-                        Details
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                    ))
+                  ) : (
+                    <p className="text-center text-muted-foreground py-8">No tasks found. Create your first task!</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 
-        <TabsContent value="fees" className="space-y-4">
-          <FeesManagement userRole="teacher" />
+        <TabsContent value="assignments">
+          <Card>
+            <CardHeader>
+              <CardTitle>Assignments</CardTitle>
+              <CardDescription>This feature is under construction.</CardDescription>
+            </CardHeader>
+          </Card>
         </TabsContent>
 
-        <TabsContent value="leave" className="space-y-4">
+        <TabsContent value="leave">
           <LeaveManagement userRole="teacher" />
         </TabsContent>
 
-        <TabsContent value="timetable" className="space-y-4">
+        <TabsContent value="timetable">
           <TimetableManagement userRole="teacher" />
         </TabsContent>
       </Tabs>

@@ -1,22 +1,13 @@
 // The base URL for the API, configured via environment variables for flexibility.
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
-// --- API Response Interfaces ---/
-
-/**
- * A generic wrapper for all API responses.
- * @template T The type of the data payload in a successful response.
- */
+// --- API Response Interfaces ---
 export interface ApiResponse<T = any> {
   success: boolean;
   data?: T;
   message?: string;
   errors?: Record<string, string[]>;
 }
-
-/**
- * Represents the structure of a User object from the backend.
- */
 export interface User {
   id: number;
   username: string;
@@ -27,43 +18,27 @@ export interface User {
   profile?: {
     phone?: string;
     address?: string;
-    class_name?: string; // Student-specific
-    subject?: string;    // Teacher-specific
+    class_name?: string;
+    subject?: string;
   };
 }
-
-/**
- * Represents the authentication tokens returned upon successful login.
- */
 export interface AuthTokens {
   access: string;
   refresh: string;
 }
 
 // --- API Client Class ---
-
-/**
- * Manages all communication with the backend API, including authentication,
- * token management, and making requests.
- */
 class ApiClient {
   private baseURL: string;
   private accessToken: string | null = null;
 
   constructor(baseURL: string) {
     this.baseURL = baseURL;
-    // Immediately load the access token from storage if it exists.
     if (typeof window !== "undefined") {
       this.accessToken = localStorage.getItem("access_token");
     }
   }
 
-  // --- Private Token Helpers for Encapsulation ---
-
-  /**
-   * Sets both access and refresh tokens in the client and localStorage.
-   * This is the single source of truth for saving tokens.
-   */
   private setTokens(access: string, refresh: string) {
     this.accessToken = access;
     if (typeof window !== "undefined") {
@@ -72,9 +47,6 @@ class ApiClient {
     }
   }
 
-  /**
-   * Retrieves the refresh token from localStorage.
-   */
   private getRefreshToken(): string | null {
     if (typeof window !== "undefined") {
       return localStorage.getItem("refresh_token");
@@ -82,9 +54,6 @@ class ApiClient {
     return null;
   }
 
-  /**
-   * Public method to set only the access token, used after a refresh.
-   */
   public setAccessToken(token: string) {
     this.accessToken = token;
     if (typeof window !== "undefined") {
@@ -92,9 +61,6 @@ class ApiClient {
     }
   }
 
-  /**
-   * Clears all authentication tokens from the client and localStorage.
-   */
   public clearTokens() {
     this.accessToken = null;
     if (typeof window !== "undefined") {
@@ -103,170 +69,107 @@ class ApiClient {
     }
   }
 
-  /**
-   * The core method for making all API requests.
-   * It handles adding headers, token refresh, and error parsing.
-   */
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
     const url = `${this.baseURL}${endpoint}`;
-
-    const headers: HeadersInit = {
-      "Content-Type": "application/json",
-      ...options.headers,
-    };
-
+    const headers: HeadersInit = { "Content-Type": "application/json", ...options.headers };
     if (this.accessToken) {
       headers.Authorization = `Bearer ${this.accessToken}`;
     }
-
+    const fetchOptions: RequestInit = { ...options, headers, cache: 'no-store' };
     try {
-      const response = await fetch(url, { ...options, headers });
-
-      // Handle responses with no JSON body (e.g., 204 No Content)
+      const response = await fetch(url, fetchOptions);
       const contentType = response.headers.get("content-type");
       let data;
       if (contentType && contentType.includes("application/json")) {
         data = await response.json();
+      } else if (response.ok) {
+        // Handle non-JSON success responses (like HTML for reports)
+        return { success: true, data: await response.text() as any };
       }
 
       if (!response.ok) {
-        // Prevent an infinite refresh loop if the refresh endpoint itself fails
         const isRefreshing = endpoint.includes("/auth/token/refresh/");
-
         if (response.status === 401 && this.accessToken && !isRefreshing) {
           const refreshed = await this.refreshToken();
           if (refreshed) {
-            // Retry the original request with the new token
-            // We pass the original options, which will now be sent with the new token
             return this.request(endpoint, options);
           } else {
             this.clearTokens();
-            // Optional: You could trigger a redirect to the login page here
-            // if (typeof window !== 'undefined') window.location.href = '/login';
-            return {
-              success: false,
-              message: "Your session has expired. Please login again.",
-            };
+            return { success: false, message: "Your session has expired. Please login again." };
           }
         }
-
-        return {
-          success: false,
-          message: data?.detail || data?.message || `HTTP Error: ${response.status}`,
-          errors: data?.errors || {},
-        };
+        return { success: false, message: data?.detail || data?.message || `HTTP Error: ${response.status}`, errors: data?.errors || {} };
       }
-
       return { success: true, data };
     } catch (error) {
       console.error("API request failed:", error);
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : "A network error occurred.",
-      };
+      return { success: false, message: error instanceof Error ? error.message : "A network error occurred." };
     }
   }
 
-  /**
-   * Attempts to get a new access token using the stored refresh token.
-   */
   private async refreshToken(): Promise<boolean> {
     const refreshToken = this.getRefreshToken();
     if (!refreshToken) return false;
-
     const response = await this.request<{ access: string }>("/auth/token/refresh/", {
       method: "POST",
       body: JSON.stringify({ refresh: refreshToken }),
     });
-
     if (response.success && response.data?.access) {
       this.setAccessToken(response.data.access);
       return true;
     }
-    
     return false;
   }
 
-  // --- Public API Methods ---
-
-  // Authentication
   async login(username: string, password: string): Promise<ApiResponse<{ user: User; tokens: AuthTokens }>> {
-    type LoginResponse = {
-        access: string;
-        refresh: string;
-        user: User;
-    }
-
+    type LoginResponse = { access: string; refresh: string; user: User };
     const response = await this.request<LoginResponse>("/auth/login/", {
       method: "POST",
       body: JSON.stringify({ username, password }),
     });
-
     if (response.success && response.data) {
       const { access, refresh, user } = response.data;
       this.setTokens(access, refresh);
-
-      return {
-        success: true,
-        data: {
-          user,
-          tokens: { access, refresh },
-        },
-      };
+      return { success: true, data: { user, tokens: { access, refresh } } };
     }
-
     return response;
   }
 
   async logout(): Promise<ApiResponse> {
     const refreshToken = this.getRefreshToken();
-    
-    // Tell the backend to blacklist the token for improved security
     if (refreshToken) {
         await this.request("/auth/logout/", {
             method: "POST",
             body: JSON.stringify({ refresh: refreshToken }),
         });
     }
-
     this.clearTokens();
     return { success: true, message: "Logged out successfully" };
   }
 
-  async getCurrentUser(): Promise<ApiResponse<User>> {
-    return this.request<User>("/auth/user/");
-  }
-
-  // Generic CRUD operations
-  async get<T>(endpoint: string): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint);
-  }
-
-  async post<T>(endpoint: string, data: any): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, { method: "POST", body: JSON.stringify(data) });
-  }
-
-  async put<T>(endpoint: string, data: any): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, { method: "PUT", body: JSON.stringify(data) });
-  }
-
-  async patch<T>(endpoint: string, data: any): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, { method: "PATCH", body: JSON.stringify(data) });
-  }
-
-  async delete<T>(endpoint: string): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, { method: "DELETE" });
-  }
+  async getCurrentUser(): Promise<ApiResponse<User>> { return this.request<User>("/auth/user/"); }
+  async get<T>(endpoint: string): Promise<ApiResponse<T>> { return this.request<T>(endpoint); }
+  async post<T>(endpoint: string, data: any): Promise<ApiResponse<T>> { return this.request<T>(endpoint, { method: "POST", body: JSON.stringify(data) }); }
+  async put<T>(endpoint: string, data: any): Promise<ApiResponse<T>> { return this.request<T>(endpoint, { method: "PUT", body: JSON.stringify(data) }); }
+  async patch<T>(endpoint: string, data: any): Promise<ApiResponse<T>> { return this.request<T>(endpoint, { method: "PATCH", body: JSON.stringify(data) }); }
+  async delete<T>(endpoint: string): Promise<ApiResponse<T>> { return this.request<T>(endpoint, { method: "DELETE" }); }
 }
 
 // --- Singleton Instance and Helper Object ---
-
-// Create a single, shared instance of the ApiClient.
 export const apiClient = new ApiClient(API_BASE_URL);
 
-// Create a structured helper object for easy access to all API endpoints.
-// This provides excellent autocompletion and type safety in your code.
 export const api = {
+  admin: {
+    updateUser: (userId: number, data: { username?: string; password?: string }) =>
+      apiClient.post("/admin/update-user/", {
+        user_id: userId,
+        username: data.username,
+        password: data.password,
+      }),
+  },
+  users: {
+    list: () => apiClient.get("/users/"),
+  },
   auth: {
     login: (username: string, password: string) => apiClient.login(username, password),
     logout: () => apiClient.logout(),
@@ -280,6 +183,7 @@ export const api = {
     delete: (id: number) => apiClient.delete(`/students/${id}/`),
     fees: (id: number) => apiClient.get(`/students/${id}/fees/`),
     attendance: (id: number) => apiClient.get(`/students/${id}/attendance/`),
+    details: (id: number) => apiClient.get(`/student/${id}/details/`),
   },
   teachers: {
     list: () => apiClient.get("/teachers/"),
@@ -297,14 +201,21 @@ export const api = {
     delete: (id: number) => apiClient.delete(`/classes/${id}/`),
     students: (id: number) => apiClient.get(`/classes/${id}/students/`),
     timetable: (id: number) => apiClient.get(`/classes/${id}/timetable/`),
+    details: (id: number) => apiClient.get(`/classes/${id}/details/`),
   },
   fees: {
     list: () => apiClient.get("/fees/"),
-    get: (id: number) => apiClient.get(`/fees/${id}/`),
-    create: (data: any) => apiClient.post("/fees/", data),
-    update: (id: number, data: any) => apiClient.put(`/fees/${id}/`, data),
+    createFee: (studentId: number, amount: number, dueDate: string) => 
+      apiClient.post("/fees/actions/", { action: "create_fee", student_id: studentId, amount, due_date: dueDate }),
+    createClassFee: (classId: number, amount: number, dueDate: string) =>
+      apiClient.post("/fees/actions/", { action: "create_class_fee", class_id: classId, amount, due_date: dueDate }),
+    sendReminders: () => 
+      apiClient.post("/fees/actions/", { action: "send_reminders" }),
     delete: (id: number) => apiClient.delete(`/fees/${id}/`),
-    pay: (id: number, data: any) => apiClient.post(`/fees/${id}/pay/`, data),
+  },
+  feeTypes: {
+    list: () => apiClient.get("/fee-types/"),
+    update: (id: number, data: { amount: number }) => apiClient.patch(`/fee-types/${id}/`, data),
   },
   attendance: {
     list: () => apiClient.get("/attendance/"),
@@ -330,8 +241,25 @@ export const api = {
     reject: (id: number) => apiClient.patch(`/leaves/${id}/`, { status: "rejected" }),
   },
   reports: {
-    attendance: (params?: any) => apiClient.get(`/reports/attendance/?${new URLSearchParams(params)}`),
-    fees: (params?: any) => apiClient.get(`/reports/fees/?${new URLSearchParams(params)}`),
-    academic: (params?: any) => apiClient.get(`/reports/academic/?${new URLSearchParams(params)}`),
+    academic: () => apiClient.get(`/reports/academic/`),
+    feesSummary: () => apiClient.get(`/reports/fees-summary/`),
   },
+  health: {
+    check: () => apiClient.get("/health/"),
+  },
+    periods: {
+      list: () => apiClient.get("/periods/"),
+      update: (id: number, data: { start_time: string, end_time: string }) =>
+        apiClient.patch(`/periods/${id}/`, data),
+    },
+    tasks: {
+      list: () => apiClient.get("/tasks/"),
+      create: (data: any) => apiClient.post("/tasks/", data),
+      update: (id: number, data: any) => apiClient.put(`/tasks/${id}/`, data),
+      delete: (id: number) => apiClient.delete(`/tasks/${id}/`),
+      markCompleted: (id: number) => apiClient.post(`/tasks/${id}/mark_completed/`, {}),
+      markInProgress: (id: number) => apiClient.post(`/tasks/${id}/mark_in_progress/`, {}),
+      todayTasks: () => apiClient.get("/tasks/today_tasks/"),
+      upcomingTasks: () => apiClient.get("/tasks/upcoming_tasks/"),
+    }
 };

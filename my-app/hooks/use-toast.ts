@@ -3,14 +3,6 @@
 // Inspired by react-hot-toast library
 import * as React from "react"
 
-import type {
-  ToastActionElement,
-  ToastProps,
-} from "@/components/ui/toast"
-
-const TOAST_LIMIT = 1
-const TOAST_REMOVE_DELAY = 1000000
-
 type ToasterToast = ToastProps & {
   id: string
   title?: React.ReactNode
@@ -18,39 +10,17 @@ type ToasterToast = ToastProps & {
   action?: ToastActionElement
 }
 
-const actionTypes = {
-  ADD_TOAST: "ADD_TOAST",
-  UPDATE_TOAST: "UPDATE_TOAST",
-  DISMISS_TOAST: "DISMISS_TOAST",
-  REMOVE_TOAST: "REMOVE_TOAST",
-} as const
+const actionTypes = ["ADD_TOAST", "UPDATE_TOAST", "DISMISS_TOAST", "REMOVE_TOAST"] as const
+const TOAST_LIMIT = 10
+const TOAST_REMOVE_DELAY = 1000000
 
-let count = 0
-
-function genId() {
-  count = (count + 1) % Number.MAX_SAFE_INTEGER
-  return count.toString()
-}
-
-type ActionType = typeof actionTypes
+type ActionType = typeof actionTypes[number]
 
 type Action =
-  | {
-      type: ActionType["ADD_TOAST"]
-      toast: ToasterToast
-    }
-  | {
-      type: ActionType["UPDATE_TOAST"]
-      toast: Partial<ToasterToast>
-    }
-  | {
-      type: ActionType["DISMISS_TOAST"]
-      toastId?: ToasterToast["id"]
-    }
-  | {
-      type: ActionType["REMOVE_TOAST"]
-      toastId?: ToasterToast["id"]
-    }
+  | { type: "ADD_TOAST"; toast: ToasterToast }
+  | { type: "UPDATE_TOAST"; toast: Partial<ToasterToast> }
+  | { type: "DISMISS_TOAST"; toastId?: ToasterToast["id"] }
+  | { type: "REMOVE_TOAST"; toastId?: ToasterToast["id"] }
 
 interface State {
   toasts: ToasterToast[]
@@ -93,8 +63,7 @@ export const reducer = (state: State, action: Action): State => {
     case "DISMISS_TOAST": {
       const { toastId } = action
 
-      // ! Side effects ! - This could be extracted into a dismissToast() action,
-      // but I'll keep it here for simplicity
+      // ! Side-effect in a reducer... This is not ideal.
       if (toastId) {
         addToRemoveQueue(toastId)
       } else {
@@ -142,7 +111,7 @@ function dispatch(action: Action) {
 
 type Toast = Omit<ToasterToast, "id">
 
-function toast({ ...props }: Toast) {
+function toast(props: Toast) {
   const id = genId()
 
   const update = (props: ToasterToast) =>
@@ -190,5 +159,16 @@ function useToast() {
     dismiss: (toastId?: string) => dispatch({ type: "DISMISS_TOAST", toastId }),
   }
 }
+
+let count = 0
+
+function genId() {
+  count = (count + 1) % 1_000_000
+  return count.toString()
+}
+
+type ToastProps = React.ComponentProps<typeof Toast>
+
+type ToastActionElement = React.ReactElement<typeof ToastAction>
 
 export { useToast, toast }

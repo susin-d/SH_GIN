@@ -2,8 +2,10 @@
 
 import type React from "react"
 import { createContext, useContext, useState, useEffect } from "react"
-import { api } from "./api"
+import { api } from "./api" // Use the helper object
+import { useRouter } from "next/navigation"
 
+// --- TypeScript Interfaces ---
 export type UserRole = "principal" | "teacher" | "student"
 
 export interface User {
@@ -19,7 +21,6 @@ export interface User {
     class_name?: string
     subject?: string
   }
-  avatar?: string
 }
 
 interface AuthContextType {
@@ -32,64 +33,33 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-const mockUsers: User[] = [
-  {
-    id: 1,
-    username: "principal",
-    email: "principal@school.edu",
-    first_name: "Sarah",
-    last_name: "Johnson",
-    role: "principal",
-    avatar: "/professional-woman-principal.png",
-  },
-  {
-    id: 2,
-    username: "teacher",
-    email: "teacher@school.edu",
-    first_name: "David",
-    last_name: "Chen",
-    role: "teacher",
-    avatar: "/male-teacher.png",
-  },
-  {
-    id: 3,
-    username: "student",
-    email: "student@school.edu",
-    first_name: "Emma",
-    last_name: "Wilson",
-    role: "student",
-    avatar: "/diverse-female-student.png",
-  },
-]
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(true) // Start loading on initial mount
   const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
 
+  // This effect runs once on initial app load to check for an existing session
   useEffect(() => {
     const initializeAuth = async () => {
-      const storedUser = localStorage.getItem("school-portal-user")
       const accessToken = localStorage.getItem("access_token")
 
-      if (storedUser && accessToken) {
+      if (accessToken) {
         try {
-          // Validate token with Django API
+          // A token exists. We must validate it with the backend to get fresh user data.
+          // The apiClient will automatically use the token from localStorage here.
           const response = await api.auth.getCurrentUser()
           if (response.success && response.data) {
             setUser(response.data)
           } else {
-            // Token invalid, clear stored data
-            localStorage.removeItem("school-portal-user")
-            localStorage.removeItem("access_token")
-            localStorage.removeItem("refresh_token")
+            // The token is invalid or expired, so log the user out.
+            api.auth.logout() // This clears tokens from apiClient and localStorage
+            setUser(null)
           }
         } catch (error) {
           console.error("Auth validation failed:", error)
-          // Clear stored data on error
-          localStorage.removeItem("school-portal-user")
-          localStorage.removeItem("access_token")
-          localStorage.removeItem("refresh_token")
+          api.auth.logout()
+          setUser(null)
         }
       }
       setIsLoading(false)
@@ -98,78 +68,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initializeAuth()
   }, [])
 
+  // This is the core login logic
   const login = async (username: string, password: string): Promise<boolean> => {
     setIsLoading(true)
     setError(null)
 
     try {
-      // Try Django API first
+      // The `api.auth.login` function handles the API call AND saving the tokens inside the apiClient.
+      // This is the most critical step.
       const response = await api.auth.login(username, password)
 
       if (response.success && response.data) {
-        const userData = response.data.user
-        setUser(userData)
-        localStorage.setItem("school-portal-user", JSON.stringify(userData))
+        // If login is successful, the tokens are now stored in the apiClient instance.
+        // Now, we can update our React state with the user object.
+        setUser(response.data.user)
         setIsLoading(false)
+        router.push("/") // Redirect to the dashboard page
         return true
       } else {
-        console.log("Django API login failed, trying mock authentication...")
-
-        // Simulate API call delay
-        await new Promise((resolve) => setTimeout(resolve, 1000))
-
-        // Find user by username (simplified for demo)
-        const foundUser = mockUsers.find((u) => u.username === username)
-
-        if (foundUser && (password === "demo" || password === foundUser.username)) {
-          setUser(foundUser)
-          localStorage.setItem("school-portal-user", JSON.stringify(foundUser))
-          setIsLoading(false)
-          return true
-        }
-
-        setError(response.message || "Invalid credentials")
+        // Handle login failure from the API (e.g., wrong password)
+        setError(response.message || "Invalid credentials. Please try again.")
         setIsLoading(false)
         return false
       }
-    } catch (error) {
-      console.error("Login error:", error)
-
-      console.log("Network error, trying mock authentication...")
-
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-
-      const foundUser = mockUsers.find((u) => u.username === username)
-
-      if (foundUser && (password === "demo" || password === foundUser.username)) {
-        setUser(foundUser)
-        localStorage.setItem("school-portal-user", JSON.stringify(foundUser))
-        setIsLoading(false)
-        return true
-      }
-
-      setError("Network error. Please check your connection.")
+    } catch (err) {
+      console.error("Login process error:", err)
+      setError("A network error occurred. Please try again.")
       setIsLoading(false)
       return false
     }
   }
 
+  // This is the core logout logic
   const logout = async () => {
-    try {
-      // Call Django logout endpoint
-      await api.auth.logout()
-    } catch (error) {
-      console.error("Logout error:", error)
-    } finally {
-      // Clear local state regardless of API response
-      setUser(null)
-      localStorage.removeItem("school-portal-user")
-      localStorage.removeItem("access_token")
-      localStorage.removeItem("refresh_token")
-    }
+    await api.auth.logout() // Tell backend to invalidate the token and clear local tokens
+    setUser(null)
+    router.push("/") // Redirect to the login page
   }
 
-  return <AuthContext.Provider value={{ user, login, logout, isLoading, error }}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider value={{ user, login, logout, isLoading, error }}>
+      {children}
+    </AuthContext.Provider>
+  )
 }
 
 export function useAuth() {
