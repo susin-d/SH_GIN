@@ -5,14 +5,14 @@ import { LoginForm } from "@/components/login-form"
 import { PrincipalDashboard } from "@/components/principal-dashboard"
 import { TeacherDashboard } from "@/components/teacher-dashboard"
 import { StudentDashboard } from "@/components/student-dashboard"
+import { Header } from "@/components/header"
 import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { LogOut, GraduationCap, Heart } from "lucide-react"
+import { Heart, Sparkles, Loader2 } from "lucide-react"
 import { api } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
 
 function Dashboard() {
-  const { user, logout } = useAuth()
+  const { user } = useAuth()
   const { toast } = useToast()
 
   const handleHealthCheck = async () => {
@@ -37,77 +37,29 @@ function Dashboard() {
 
   if (!user) return null
 
-  const getRoleColor = (role: string) => {
+  const getRoleDescription = (role: string) => {
     switch (role) {
       case "principal":
-        return "bg-purple-100 text-purple-800"
+        return "Welcome to your administrative dashboard"
       case "teacher":
-        return "bg-blue-100 text-blue-800"
+        return "Welcome to your teaching dashboard"
       case "student":
-        return "bg-green-100 text-green-800"
+        return "Welcome to your student portal"
       default:
-        return "bg-gray-100 text-gray-800"
+        return "Welcome to your dashboard"
     }
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <GraduationCap className="h-6 w-6 text-blue-600" />
-                <h1 className="text-xl font-semibold text-gray-900">School Portal</h1>
-              </div>
-              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getRoleColor(user.role)}`}>
-                {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
-              </span>
-            </div>
+    <div className="min-h-screen bg-background">
+      <Header />
 
-            <div className="flex items-center space-x-4">
-               <div className="flex items-center space-x-3">
-                 <Avatar className="h-8 w-8">
-                   <AvatarImage src="/placeholder.svg" alt={`${user.first_name} ${user.last_name}` || "User"} />
-                   <AvatarFallback>
-                     {user.first_name && user.last_name
-                       ? `${user.first_name[0]}${user.last_name[0]}`
-                       : "U"}
-                   </AvatarFallback>
-                 </Avatar>
-                 <div className="hidden sm:block">
-                   <div className="text-sm font-medium text-gray-900">{`${user.first_name} ${user.last_name}` || "User"}</div>
-                   <div className="text-xs text-gray-500">{user.email || "No email"}</div>
-                 </div>
-               </div>
-
-               <Button variant="enhanced" size="sm" onClick={handleHealthCheck}>
-                 <Heart className="h-4 w-4 mr-2" />
-                 Health Check
-               </Button>
-
-               <Button variant="outline" size="sm" onClick={logout}>
-                 <LogOut className="h-4 w-4 mr-2" />
-                 Logout
-               </Button>
-             </div>
-          </div>
+      <main className="container mx-auto px-4 py-8">
+        <div className="space-y-8">
+          {user.role === "principal" && <PrincipalDashboard />}
+          {user.role === "teacher" && <TeacherDashboard />}
+          {user.role === "student" && <StudentDashboard />}
         </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold text-gray-900">Hello, {`${user.first_name} ${user.last_name}` || "User"}!</h2>
-          <p className="text-gray-600 mt-1">
-            {user.role === "principal" && "Welcome to your administrative dashboard"}
-            {user.role === "teacher" && "Welcome to your teaching dashboard"}
-            {user.role === "student" && "Welcome to your student portal"}
-          </p>
-        </div>
-
-        {user.role === "principal" && <PrincipalDashboard />}
-        {user.role === "teacher" && <TeacherDashboard />}
-        {user.role === "student" && <StudentDashboard />}
       </main>
     </div>
   )
@@ -118,10 +70,23 @@ export default function HomePage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-2 text-gray-600">Loading...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
+        <div className="text-center space-y-6 animate-fade-in">
+          <div className="relative">
+            <div className="w-20 h-20 mx-auto bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg animate-bounce-in">
+              <Sparkles className="h-10 w-10 text-white animate-pulse" />
+            </div>
+            <div className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-br from-green-400 to-blue-500 rounded-full animate-ping"></div>
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              Loading School Portal
+            </h2>
+            <p className="text-muted-foreground">Setting up your personalized dashboard...</p>
+            <div className="flex justify-center mt-4">
+              <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+            </div>
+          </div>
         </div>
       </div>
     )

@@ -24,7 +24,7 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog"
-import { Loader2, KeyRound, Users, GraduationCap, Shield, Search } from "lucide-react"
+import { Loader2, KeyRound, Users, GraduationCap, Shield, Search, Heart } from "lucide-react"
 import type { User } from "@/lib/auth-context"
 
 // Define more specific types for data from the API
@@ -159,6 +159,57 @@ export function UserManagement() {
 
   return (
     <div className="space-y-6">
+      {/* Header Section */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold">User Management</h1>
+          <p className="text-muted-foreground">Manage user accounts and credentials across the system</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={handleHealthCheck}>
+          <Heart className="h-4 w-4 mr-2" />
+          Health Check
+        </Button>
+      </div>
+
+      {/* Stats Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="border-l-4 border-l-gradient-primary">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Total Students</p>
+                <p className="text-2xl font-bold">{students.length}</p>
+              </div>
+              <GraduationCap className="h-8 w-8 text-gradient-primary" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-l-4 border-l-gradient-secondary">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Total Teachers</p>
+                <p className="text-2xl font-bold">{teachers.length}</p>
+              </div>
+              <Users className="h-8 w-8 text-gradient-secondary" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-l-4 border-l-gradient-accent">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Other Staff</p>
+                <p className="text-2xl font-bold">{otherUsers.length}</p>
+              </div>
+              <Shield className="h-8 w-8 text-gradient-accent" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       <Dialog open={!!selectedUser} onOpenChange={(isOpen) => !isOpen && handleCloseDialog()}>
         <DialogContent>
           <DialogHeader>

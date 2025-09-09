@@ -159,3 +159,45 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# ===== CACHE CONFIGURATION =====
+# https://docs.djangoproject.com/en/5.2/topics/cache/
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+        'LOCATION': 'api_cache_table',
+        'TIMEOUT': 300,  # 5 minutes default timeout
+        'OPTIONS': {
+            'MAX_ENTRIES': 1000,  # Maximum entries in cache
+            'CULL_FREQUENCY': 3,  # 1/3 entries removed when max reached
+        }
+    },
+    'locmem': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake',
+        'TIMEOUT': 300,
+    },
+    # Redis cache (uncomment if Redis is available)
+    # 'redis': {
+    #     'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+    #     'LOCATION': 'redis://127.0.0.1:6379/1',
+    #     'TIMEOUT': 300,
+    # }
+}
+
+# Cache middleware for view caching
+MIDDLEWARE.insert(0, 'django.middleware.cache.UpdateCacheMiddleware')
+MIDDLEWARE.append('django.middleware.cache.FetchFromCacheMiddleware')
+
+# Cache settings for views
+CACHE_MIDDLEWARE_ALIAS = 'default'
+CACHE_MIDDLEWARE_SECONDS = 300  # 5 minutes
+CACHE_MIDDLEWARE_KEY_PREFIX = 'school_api'
+
+# API-specific cache settings
+API_CACHE_TIMEOUT = 300  # 5 minutes for API responses
+API_CACHE_KEY_PREFIX = 'api_v1'
+
+# Cache page timeout for specific views
+CACHE_PAGE_TIMEOUT = 300

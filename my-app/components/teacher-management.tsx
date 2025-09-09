@@ -166,6 +166,57 @@ export function TeacherManagement() {
 
   return (
     <div className="space-y-6">
+      {/* Header Section */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold">Teacher Management</h1>
+          <p className="text-muted-foreground">Manage teacher records and staff information</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+          <Loader2 className="h-4 w-4 mr-2" />
+          Refresh
+        </Button>
+      </div>
+
+      {/* Stats Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="border-l-4 border-l-gradient-primary">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Total Teachers</p>
+                <p className="text-2xl font-bold">{teachers.length}</p>
+              </div>
+              <UserPlus className="h-8 w-8 text-gradient-primary" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-l-4 border-l-gradient-secondary">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Active Teachers</p>
+                <p className="text-2xl font-bold">{filteredTeachers.length}</p>
+              </div>
+              <Edit className="h-8 w-8 text-gradient-secondary" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-l-4 border-l-gradient-accent">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Subjects</p>
+                <p className="text-2xl font-bold">{new Set(teachers.map(t => t.profile?.subject).filter(Boolean)).size}</p>
+              </div>
+              <Search className="h-8 w-8 text-gradient-accent" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>
           <DialogHeader>

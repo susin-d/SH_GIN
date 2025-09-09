@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from django.utils import timezone
 
 # === User and Profile Models ===
 
@@ -201,7 +202,7 @@ class Task(models.Model):
     def mark_completed(self):
         """Mark the task as completed and set completion timestamp."""
         self.status = self.Status.COMPLETED
-        self.completed_at = models.timezone.now()
+        self.completed_at = timezone.now()
         self.save()
 
     def mark_in_progress(self):

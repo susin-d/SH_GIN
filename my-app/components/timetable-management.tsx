@@ -21,21 +21,23 @@ import {
   DialogClose,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { 
-  Loader2, 
-  Plus, 
-  Trash2, 
-  Edit, 
-  AlertCircle, 
-  RefreshCw, 
-  Download, 
+import {
+  Loader2,
+  Plus,
+  Trash2,
+  Edit,
+  AlertCircle,
+  RefreshCw,
+  Download,
   Upload,
   Copy,
   Calendar,
   Clock,
   Filter,
   Eye,
-  EyeOff
+  EyeOff,
+  BookOpen,
+  Users
 } from "lucide-react"
 
 // --- TypeScript Interfaces for API Data ---
@@ -516,7 +518,7 @@ export function TimetableManagement({ userRole }: TimetableManagementProps) {
   if (isLoading && classes.length === 0) {
     return (
       <div className="flex justify-center p-8">
-        <Loader2 className="h-8 w-8 animate-spin" />
+        <div className="text-muted-foreground">Loading timetable...</div>
       </div>
     );
   }
@@ -524,6 +526,69 @@ export function TimetableManagement({ userRole }: TimetableManagementProps) {
   // --- Main Render ---
   return (
     <div className="space-y-6">
+      {/* Header Section */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold">Timetable Management</h1>
+          <p className="text-muted-foreground">Manage class schedules and timetables for all classes</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Refresh
+        </Button>
+      </div>
+
+      {/* Stats Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card className="border-l-4 border-l-gradient-primary">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Total Classes</p>
+                <p className="text-2xl font-bold">{filteredTimetable.length}</p>
+              </div>
+              <Calendar className="h-8 w-8 text-gradient-primary" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-l-4 border-l-gradient-secondary">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Subjects</p>
+                <p className="text-2xl font-bold">{uniqueSubjects.length}</p>
+              </div>
+              <BookOpen className="h-8 w-8 text-gradient-secondary" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-l-4 border-l-gradient-accent">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Teachers</p>
+                <p className="text-2xl font-bold">{new Set(filteredTimetable.map(e => e.teacher?.user.id).filter(Boolean)).size}</p>
+              </div>
+              <Users className="h-8 w-8 text-gradient-accent" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-l-4 border-l-orange-500">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Weekly Hours</p>
+                <p className="text-2xl font-bold">{Math.round((filteredTimetable.length * 50) / 60 * 10) / 10}h</p>
+              </div>
+              <Clock className="h-8 w-8 text-orange-500" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {error && (
         <Card className="border-red-200 bg-red-50">
           <CardContent className="pt-4 flex items-center gap-2">
@@ -532,9 +597,8 @@ export function TimetableManagement({ userRole }: TimetableManagementProps) {
           </CardContent>
         </Card>
       )}
-      
-      {/* Header Section */}
-      <div className="flex flex-col space-y-4">
+
+      <div className="space-y-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <h3 className="text-lg font-medium">Timetable Management</h3>
@@ -678,7 +742,7 @@ export function TimetableManagement({ userRole }: TimetableManagementProps) {
           )}
           
           <Button variant="outline" onClick={handleRefresh} disabled={isLoading}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
           
@@ -762,41 +826,45 @@ export function TimetableManagement({ userRole }: TimetableManagementProps) {
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
-            <div className="grid grid-cols-7 gap-1 min-w-[900px]" role="table">
-              <div className="font-semibold text-center p-2" role="columnheader">
-                Time
-              </div>
-              {WEEK_DAYS.map((day) => (
-                <div key={day.value} className="font-semibold text-center p-2" role="columnheader">
-                  {day.shortLabel}
-                </div>
-              ))}
-              
-              {TIME_SLOTS.map((timeSlot) => (
-                <div key={timeSlot.value} className="contents" role="row">
-                  <div 
-                    className="text-sm font-semibold text-center p-2 border-t flex items-center justify-center bg-gray-50" 
-                    role="rowheader"
-                  >
-                    <div className="flex flex-col">
-                      <span>{timeSlot.shortLabel}</span>
-                      <span className="text-[10px] opacity-60">{timeSlot.value.substring(0, 5)}</span>
+            <div className="min-w-[1400px]">
+              {/* Time Header Row - Horizontal */}
+              <div className="grid grid-cols-11 gap-1 p-4 bg-gray-50 border-b">
+                <div className="font-semibold text-center py-2">Day</div>
+                {TIME_SLOTS.map((timeSlot) => (
+                  <div key={timeSlot.value} className="font-semibold text-center py-2">
+                    <div className="text-sm">{timeSlot.shortLabel}</div>
+                    <div className="text-xs text-gray-500">
+                      {timeSlot.value.substring(0, 5)}
                     </div>
                   </div>
-                  {WEEK_DAYS.map((day) => {
-                    const entry = filteredTimetable.find(e => 
+                ))}
+              </div>
+
+              {/* Day Rows - Vertical */}
+              {WEEK_DAYS.map((day) => (
+                <div key={day.value} className="grid grid-cols-11 gap-1 p-4 border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
+                  {/* Day Column */}
+                  <div className="text-center py-2">
+                    <div className="font-medium text-sm">{day.label}</div>
+                    <div className="text-xs text-gray-500">{day.value}</div>
+                  </div>
+
+                  {/* Time Slot Columns */}
+                  {TIME_SLOTS.map((timeSlot) => {
+                    const entry = filteredTimetable.find(e =>
                       e.day_of_week === day.value && e.start_time === timeSlot.value
                     );
+
                     return (
-                      <div 
-                        key={`${day.value}-${timeSlot.value}`} 
+                      <div
+                        key={`${day.value}-${timeSlot.value}`}
                         className={`p-1 border-t border-r border-gray-200 ${isCompactView ? 'min-h-[50px]' : 'min-h-[70px]'} hover:bg-gray-50 transition-colors`}
                         role="gridcell"
                         style={{
                           background: entry ? 'transparent' : 'linear-gradient(45deg, transparent 49%, #f1f5f9 49%, #f1f5f9 51%, transparent 51%)'
                         }}
                       >
-                        <TimetableCell 
+                        <TimetableCell
                           entry={entry || null}
                           userRole={userRole}
                           onEdit={handleOpenEditDialog}
@@ -901,24 +969,6 @@ export function TimetableManagement({ userRole }: TimetableManagementProps) {
         </Card>
       </div>
 
-      {/* Current Time Indicator */}
-      <div className="fixed bottom-4 right-4 bg-white border shadow-lg rounded-lg p-3">
-        <div className="text-sm font-medium text-center">
-          <Clock className="h-4 w-4 inline mr-2" />
-          {new Date().toLocaleTimeString([], { 
-            hour: '2-digit', 
-            minute: '2-digit',
-            hour12: true 
-          })}
-        </div>
-        <div className="text-xs text-muted-foreground text-center">
-          {new Date().toLocaleDateString('en-US', { 
-            weekday: 'long',
-            month: 'short', 
-            day: 'numeric' 
-          })}
-        </div>
-      </div>
     </div>
   );
 }

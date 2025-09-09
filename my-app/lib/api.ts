@@ -71,7 +71,10 @@ class ApiClient {
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
     const url = `${this.baseURL}${endpoint}`;
-    const headers: HeadersInit = { "Content-Type": "application/json", ...options.headers };
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (options.headers) {
+      Object.assign(headers, options.headers);
+    }
     if (this.accessToken) {
       headers.Authorization = `Bearer ${this.accessToken}`;
     }
@@ -132,7 +135,7 @@ class ApiClient {
       this.setTokens(access, refresh);
       return { success: true, data: { user, tokens: { access, refresh } } };
     }
-    return response;
+    return response as unknown as ApiResponse<{ user: User; tokens: AuthTokens }>;
   }
 
   async logout(): Promise<ApiResponse> {
@@ -241,8 +244,13 @@ export const api = {
     reject: (id: number) => apiClient.patch(`/leaves/${id}/`, { status: "rejected" }),
   },
   reports: {
-    academic: () => apiClient.get(`/reports/academic/`),
-    feesSummary: () => apiClient.get(`/reports/fees-summary/`),
+    list: () => apiClient.get("/report-management/list_reports/"),
+    generate: (data: { report_type: string; format: string }) =>
+      apiClient.post("/report-management/generate/", data),
+    files: (reportId: string) => apiClient.get(`/report-management/${reportId}/files/`),
+    download: (reportId: string, params: { path: string }) =>
+      apiClient.get(`/report-management/${reportId}/download/?path=${encodeURIComponent(params.path)}`),
+    delete: (reportId: string) => apiClient.delete(`/report-management/${reportId}/delete/`),
   },
   health: {
     check: () => apiClient.get("/health/"),

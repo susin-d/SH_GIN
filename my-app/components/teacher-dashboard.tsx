@@ -23,6 +23,9 @@ import {
   Send,
   Loader2,
   Heart,
+  Settings,
+  Download,
+  Eye,
 } from "lucide-react"
 import { LeaveManagement } from "./leave-management"
 import { TimetableManagement } from "./timetable-management"
@@ -128,8 +131,8 @@ export function TeacherDashboard() {
         // Refresh tasks
         const tasksRes = await api.tasks.list()
         const todayTasksRes = await api.tasks.todayTasks()
-        if (tasksRes.success) setTasks(tasksRes.data)
-        if (todayTasksRes.success) setTodayTasks(todayTasksRes.data)
+        if (tasksRes.success) setTasks(tasksRes.data as any[])
+        if (todayTasksRes.success) setTodayTasks(todayTasksRes.data as any[])
       } else {
         throw new Error(response.message)
       }
@@ -236,8 +239,7 @@ export function TeacherDashboard() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        <span className="ml-2">Loading Your Dashboard...</span>
+        <div className="text-muted-foreground">Loading Your Dashboard...</div>
       </div>
     )
   }
@@ -256,68 +258,187 @@ export function TeacherDashboard() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Health Check Button */}
-      <div className="flex justify-end">
-        <Button variant="enhanced" size="sm" onClick={handleHealthCheck}>
-          <Heart className="h-4 w-4 mr-2" />
-          Health Check
-        </Button>
+    <div className="flex flex-col lg:flex-row gap-6">
+      {/* Left Sidebar for Teacher Tools */}
+      <aside className="w-full lg:w-64 lg:flex-shrink-0 animate-slide-up">
+        <Card className="h-full backdrop-blur-sm bg-white/90 dark:bg-slate-800/90 border-white/20 dark:border-slate-700/20 shadow-xl">
+          <CardHeader className="pb-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-slate-800 dark:to-slate-700 rounded-t-lg">
+            <CardTitle className="text-lg font-semibold flex items-center gap-3 text-foreground">
+              <div className="p-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg">
+                <BookOpen className="h-5 w-5 text-white" />
+              </div>
+              Teacher Tools
+            </CardTitle>
+            <CardDescription className="text-sm font-medium">
+              Teaching Management
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-4">
+            <div className="space-y-2">
+              <Button variant="outline" className="w-full h-12 flex items-center gap-3 justify-start hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 dark:hover:from-blue-900/20 dark:hover:to-purple-900/20 transition-all duration-300 border-2 hover:border-blue-300 dark:hover:border-blue-600 font-medium" onClick={() => setActiveTab("classes")}>
+                <BookOpen className="h-4 w-4 text-blue-600" />
+                <span className="text-sm font-medium">My Classes</span>
+              </Button>
+              <Button variant="outline" className="w-full h-12 flex items-center gap-3 justify-start hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900/20 dark:hover:to-emerald-900/20 transition-all duration-300 border-2 hover:border-green-300 dark:hover:border-green-600 font-medium" onClick={() => setActiveTab("students")}>
+                <Users className="h-4 w-4 text-green-600" />
+                <span className="text-sm font-medium">Students</span>
+              </Button>
+              <Button variant="outline" className="w-full h-12 flex items-center gap-3 justify-start hover:bg-gradient-to-r hover:from-purple-50 hover:to-pink-50 dark:hover:from-purple-900/20 dark:hover:to-pink-900/20 transition-all duration-300 border-2 hover:border-purple-300 dark:hover:border-purple-600 font-medium" onClick={() => setActiveTab("tasks")}>
+                <CheckCircle className="h-4 w-4 text-purple-600" />
+                <span className="text-sm font-medium">Tasks</span>
+              </Button>
+              <Button variant="outline" className="w-full h-12 flex items-center gap-3 justify-start hover:bg-gradient-to-r hover:from-orange-50 hover:to-yellow-50 dark:hover:from-orange-900/20 dark:hover:to-yellow-900/20 transition-all duration-300 border-2 hover:border-orange-300 dark:hover:border-orange-600 font-medium" onClick={() => setActiveTab("assignments")}>
+                <FileText className="h-4 w-4 text-orange-600" />
+                <span className="text-sm font-medium">Assignments</span>
+              </Button>
+              <Button variant="outline" className="w-full h-12 flex items-center gap-3 justify-start hover:bg-gradient-to-r hover:from-red-50 hover:to-pink-50 dark:hover:from-red-900/20 dark:hover:to-pink-900/20 transition-all duration-300 border-2 hover:border-red-300 dark:hover:border-red-600 font-medium" onClick={() => setActiveTab("leave")}>
+                <Clock className="h-4 w-4 text-red-600" />
+                <span className="text-sm font-medium">Leave</span>
+              </Button>
+              <Button variant="outline" className="w-full h-12 flex items-center gap-3 justify-start hover:bg-gradient-to-r hover:from-indigo-50 hover:to-blue-50 dark:hover:from-indigo-900/20 dark:hover:to-blue-900/20 transition-all duration-300 border-2 hover:border-indigo-300 dark:hover:border-indigo-600 font-medium" onClick={() => setActiveTab("timetable")}>
+                <Clock className="h-4 w-4 text-indigo-600" />
+                <span className="text-sm font-medium">Schedule</span>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </aside>
+
+      {/* Main Content Area */}
+      <main className="flex-1 space-y-6">
+        {/* Top Action Buttons - Consistent Right Alignment */}
+        <div className="flex justify-end gap-3">
+          <Button variant="outline" size="sm" onClick={handleHealthCheck}>
+            <Heart className="h-4 w-4 mr-2" />
+            Health Check
+          </Button>
+        </div>
+
+      {/* Stats Overview - Enhanced Grid Layout */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-fade-in">
+        <Card className="stats-card group hover:scale-105 transition-all duration-300 border-0 shadow-xl">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-sm font-semibold text-white/90">My Classes</CardTitle>
+            <BookOpen className="h-5 w-5 text-white/80" />
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="text-3xl font-bold text-white mb-1">
+              {isLoading ? (
+                <div className="flex items-center space-x-2">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                  <span className="text-lg">Loading</span>
+                </div>
+              ) : (
+                stats?.total_classes ?? 0
+              )}
+            </div>
+            <p className="text-xs text-white/70 font-medium">Assigned classes</p>
+          </CardContent>
+        </Card>
+        <Card className="stats-card-green group hover:scale-105 transition-all duration-300 border-0 shadow-xl" style={{ animationDelay: '0.1s' }}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-sm font-semibold text-white/90">Total Students</CardTitle>
+            <Users className="h-5 w-5 text-white/80" />
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="text-3xl font-bold text-white mb-1">
+              {isLoading ? (
+                <div className="flex items-center space-x-2">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                  <span className="text-lg">Loading</span>
+                </div>
+              ) : (
+                stats?.total_students ?? 0
+              )}
+            </div>
+            <p className="text-xs text-white/70 font-medium">Across all classes</p>
+          </CardContent>
+        </Card>
+        <Card className="stats-card-orange group hover:scale-105 transition-all duration-300 border-0 shadow-xl" style={{ animationDelay: '0.2s' }}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-sm font-semibold text-white/90">Attendance Rate</CardTitle>
+            <BarChart3 className="h-5 w-5 text-white/80" />
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="text-3xl font-bold text-white mb-1">91.5%</div>
+            <p className="text-xs text-white/70 font-medium">Overall performance</p>
+          </CardContent>
+        </Card>
+        <Card className="stats-card-purple group hover:scale-105 transition-all duration-300 border-0 shadow-xl" style={{ animationDelay: '0.3s' }}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-sm font-semibold text-white/90">Pending Tasks</CardTitle>
+            <AlertCircle className="h-5 w-5 text-white/80" />
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="text-3xl font-bold text-white mb-1">
+              {isLoading ? (
+                <div className="flex items-center space-x-2">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                  <span className="text-lg">Loading</span>
+                </div>
+              ) : (
+                todayTasks.filter((task: any) => task.status === 'pending').length
+              )}
+            </div>
+            <p className="text-xs text-white/70 font-medium">Due today</p>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">My Classes</CardTitle>
-            <BookOpen className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.total_classes ?? "N/A"}</div>
-            <p className="text-xs text-muted-foreground">Total assigned classes</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Students</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.total_students ?? "N/A"}</div>
-            <p className="text-xs text-muted-foreground">Across all your classes</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Attendance Rate</CardTitle>
-            <BarChart3 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">91.5%</div>
-            <p className="text-xs text-muted-foreground">(Demo Data)</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Tasks</CardTitle>
-            <AlertCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{todayTasks.filter((task: any) => task.status === 'pending').length}</div>
-            <p className="text-xs text-muted-foreground">Due today</p>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Quick Actions - Enhanced Layout */}
+      <Card className="backdrop-blur-sm bg-white/90 dark:bg-slate-800/90 border-white/20 dark:border-slate-700/20 shadow-xl animate-slide-up" style={{ animationDelay: '0.4s' }}>
+        <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700 rounded-t-lg">
+          <CardTitle className="text-xl font-bold flex items-center gap-3">
+            <div className="p-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg">
+              <Settings className="h-5 w-5 text-white" />
+            </div>
+            Quick Actions
+          </CardTitle>
+          <CardDescription className="text-base font-medium">
+            Access common teaching tasks with one click
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-6">
+          <Button variant="outline" className="h-24 flex-col gap-3 hover:bg-gradient-to-br hover:from-blue-50 hover:to-indigo-50 dark:hover:from-blue-900/20 dark:hover:to-indigo-900/20 transition-all duration-300 border-2 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-lg transform hover:scale-105" onClick={() => setActiveTab("tasks")}>
+            <CheckCircle className="h-6 w-6 text-blue-600" />
+            <span className="text-sm font-semibold">Today's Tasks</span>
+          </Button>
+          <Button variant="outline" className="h-24 flex-col gap-3 hover:bg-gradient-to-br hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900/20 dark:hover:to-emerald-900/20 transition-all duration-300 border-2 hover:border-green-300 dark:hover:border-green-600 hover:shadow-lg transform hover:scale-105" onClick={() => setActiveTab("students")}>
+            <Users className="h-6 w-6 text-green-600" />
+            <span className="text-sm font-semibold">Student List</span>
+          </Button>
+          <Button variant="outline" className="h-24 flex-col gap-3 hover:bg-gradient-to-br hover:from-purple-50 hover:to-pink-50 dark:hover:from-purple-900/20 dark:hover:to-pink-900/20 transition-all duration-300 border-2 hover:border-purple-300 dark:hover:border-purple-600 hover:shadow-lg transform hover:scale-105" onClick={() => setActiveTab("classes")}>
+            <BookOpen className="h-6 w-6 text-purple-600" />
+            <span className="text-sm font-semibold">My Classes</span>
+          </Button>
+          <Button variant="outline" className="h-24 flex-col gap-3 hover:bg-gradient-to-br hover:from-orange-50 hover:to-yellow-50 dark:hover:from-orange-900/20 dark:hover:to-yellow-900/20 transition-all duration-300 border-2 hover:border-orange-300 dark:hover:border-orange-600 hover:shadow-lg transform hover:scale-105" onClick={() => setActiveTab("timetable")}>
+            <Clock className="h-6 w-6 text-orange-600" />
+            <span className="text-sm font-semibold">My Schedule</span>
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* Main Content Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4 md:grid-cols-6">
-          <TabsTrigger value="classes">My Classes</TabsTrigger>
-          <TabsTrigger value="students">Students</TabsTrigger>
-          <TabsTrigger value="tasks">Tasks</TabsTrigger>
-          <TabsTrigger value="assignments">Assignments</TabsTrigger>
-          <TabsTrigger value="leave">My Leave</TabsTrigger>
-          <TabsTrigger value="timetable">My Schedule</TabsTrigger>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6 animate-slide-up" style={{ animationDelay: '0.6s' }}>
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:grid-cols-6 h-12 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border border-slate-200 dark:border-slate-700 shadow-lg">
+          <TabsTrigger value="classes" className="text-sm font-medium data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-600 data-[state=active]:text-white transition-all duration-300">
+            My Classes
+          </TabsTrigger>
+          <TabsTrigger value="students" className="text-sm font-medium data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-emerald-600 data-[state=active]:text-white transition-all duration-300">
+            Students
+          </TabsTrigger>
+          <TabsTrigger value="tasks" className="text-sm font-medium data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-pink-600 data-[state=active]:text-white transition-all duration-300">
+            Tasks
+          </TabsTrigger>
+          <TabsTrigger value="assignments" className="text-sm font-medium data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-red-500 data-[state=active]:text-white transition-all duration-300">
+            Assignments
+          </TabsTrigger>
+          <TabsTrigger value="leave" className="text-sm font-medium data-[state=active]:bg-gradient-to-r data-[state=active]:from-teal-500 data-[state=active]:to-cyan-600 data-[state=active]:text-white transition-all duration-300">
+            My Leave
+          </TabsTrigger>
+          <TabsTrigger value="timetable" className="text-sm font-medium data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-500 data-[state=active]:to-blue-600 data-[state=active]:text-white transition-all duration-300">
+            Schedule
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="classes" className="space-y-4">
@@ -399,7 +520,7 @@ export function TeacherDashboard() {
                             </Button>
                           )}
                           {task.status !== 'completed' && (
-                            <Button size="sm" variant="enhanced" onClick={() => handleMarkTaskCompleted(task.id)}>
+                            <Button size="sm" variant="default" onClick={() => handleMarkTaskCompleted(task.id)}>
                               Complete
                             </Button>
                           )}
@@ -447,7 +568,7 @@ export function TeacherDashboard() {
                             </Button>
                           )}
                           {task.status !== 'completed' && (
-                            <Button size="sm" variant="enhanced" onClick={() => handleMarkTaskCompleted(task.id)}>
+                            <Button size="sm" variant="default" onClick={() => handleMarkTaskCompleted(task.id)}>
                               Complete
                             </Button>
                           )}
@@ -464,12 +585,228 @@ export function TeacherDashboard() {
         </TabsContent>
 
         <TabsContent value="assignments">
-          <Card>
-            <CardHeader>
-              <CardTitle>Assignments</CardTitle>
-              <CardDescription>This feature is under construction.</CardDescription>
-            </CardHeader>
-          </Card>
+          <div className="space-y-6">
+            {/* Assignment Management Header */}
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-2xl font-bold">Assignment Management</h2>
+                <p className="text-muted-foreground">Create and manage assignments for your classes</p>
+              </div>
+              <Button className="bg-gradient-to-r from-gradient-primary to-gradient-secondary hover:from-gradient-primary/90 hover:to-gradient-secondary/90">
+                <Plus className="h-4 w-4 mr-2" />
+                Create Assignment
+              </Button>
+            </div>
+
+            {/* Assignment Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card className="border-l-4 border-l-gradient-primary">
+                <CardContent className="pt-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Total Assignments</p>
+                      <p className="text-2xl font-bold">12</p>
+                    </div>
+                    <FileText className="h-8 w-8 text-gradient-primary" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-l-4 border-l-gradient-secondary">
+                <CardContent className="pt-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Pending Submissions</p>
+                      <p className="text-2xl font-bold">8</p>
+                    </div>
+                    <Clock className="h-8 w-8 text-gradient-secondary" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-l-4 border-l-gradient-accent">
+                <CardContent className="pt-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Graded</p>
+                      <p className="text-2xl font-bold">4</p>
+                    </div>
+                    <CheckCircle className="h-8 w-8 text-gradient-accent" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Assignment List */}
+            <Card>
+              <CardHeader>
+                <CardTitle>All Assignments</CardTitle>
+                <CardDescription>Manage assignments across all your classes</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {/* Sample Assignment Items */}
+                  <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-gradient-to-br from-gradient-primary to-gradient-secondary rounded-lg">
+                          <FileText className="h-4 w-4 text-white" />
+                        </div>
+                        <div>
+                          <h4 className="font-semibold">Mathematics Chapter 5 - Algebra</h4>
+                          <p className="text-sm text-muted-foreground">Class 10-A • Due: Dec 15, 2024</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary" className="bg-gradient-to-r from-gradient-primary/10 to-gradient-secondary/10 text-gradient-primary">
+                        15/20 Submitted
+                      </Badge>
+                      <Button variant="outline" size="sm">
+                        <Eye className="h-4 w-4 mr-1" />
+                        View
+                      </Button>
+                      <Button variant="outline" size="sm">
+                        <Edit className="h-4 w-4 mr-1" />
+                        Edit
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-gradient-to-br from-gradient-secondary to-gradient-primary rounded-lg">
+                          <FileText className="h-4 w-4 text-white" />
+                        </div>
+                        <div>
+                          <h4 className="font-semibold">Science Lab Report - Chemical Reactions</h4>
+                          <p className="text-sm text-muted-foreground">Class 9-B • Due: Dec 18, 2024</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary" className="bg-gradient-to-r from-gradient-secondary/10 to-gradient-primary/10 text-gradient-secondary">
+                        8/25 Submitted
+                      </Badge>
+                      <Button variant="outline" size="sm">
+                        <Eye className="h-4 w-4 mr-1" />
+                        View
+                      </Button>
+                      <Button variant="outline" size="sm">
+                        <Edit className="h-4 w-4 mr-1" />
+                        Edit
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-gradient-to-br from-gradient-accent to-gradient-primary rounded-lg">
+                          <FileText className="h-4 w-4 text-white" />
+                        </div>
+                        <div>
+                          <h4 className="font-semibold">English Literature Essay</h4>
+                          <p className="text-sm text-muted-foreground">Class 10-A • Due: Dec 20, 2024</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary" className="bg-gradient-to-r from-gradient-accent/10 to-gradient-primary/10 text-gradient-accent">
+                        12/20 Submitted
+                      </Badge>
+                      <Button variant="outline" size="sm">
+                        <Eye className="h-4 w-4 mr-1" />
+                        View
+                      </Button>
+                      <Button variant="outline" size="sm">
+                        <Edit className="h-4 w-4 mr-1" />
+                        Edit
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Recent Submissions */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent Submissions</CardTitle>
+                <CardDescription>Latest assignment submissions from students</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-8 w-8">
+                        <AvatarFallback>JD</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium">John Doe</p>
+                        <p className="text-sm text-muted-foreground">Mathematics Chapter 5 - Algebra</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-xs">Submitted 2h ago</Badge>
+                      <Button variant="outline" size="sm">
+                        <Download className="h-4 w-4 mr-1" />
+                        Download
+                      </Button>
+                      <Button size="sm" className="bg-gradient-to-r from-gradient-primary to-gradient-secondary">
+                        Grade
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-8 w-8">
+                        <AvatarFallback>SM</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium">Sarah Miller</p>
+                        <p className="text-sm text-muted-foreground">Science Lab Report - Chemical Reactions</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-xs">Submitted 4h ago</Badge>
+                      <Button variant="outline" size="sm">
+                        <Download className="h-4 w-4 mr-1" />
+                        Download
+                      </Button>
+                      <Button size="sm" className="bg-gradient-to-r from-gradient-primary to-gradient-secondary">
+                        Grade
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-8 w-8">
+                        <AvatarFallback>RJ</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium">Robert Johnson</p>
+                        <p className="text-sm text-muted-foreground">English Literature Essay</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-xs">Submitted 6h ago</Badge>
+                      <Button variant="outline" size="sm">
+                        <Download className="h-4 w-4 mr-1" />
+                        Download
+                      </Button>
+                      <Button size="sm" className="bg-gradient-to-r from-gradient-primary to-gradient-secondary">
+                        Grade
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="leave">
@@ -480,6 +817,7 @@ export function TeacherDashboard() {
           <TimetableManagement userRole="teacher" />
         </TabsContent>
       </Tabs>
+      </main>
     </div>
   )
 }

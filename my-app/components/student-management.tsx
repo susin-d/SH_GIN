@@ -25,7 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Loader2, UserPlus, Edit, Trash2, Search } from "lucide-react"
+import { Loader2, UserPlus, Edit, Trash2, Search, GraduationCap, Users, BookOpen } from "lucide-react"
 
 // Define the structure of a Student object based on your serializers
 interface Student {
@@ -156,8 +156,132 @@ export function StudentManagement() {
 
   return (
     <div className="space-y-6">
+      {/* Header Section */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold">Student Management</h1>
+          <p className="text-muted-foreground">Manage student records and enrollment information</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+          <Loader2 className="h-4 w-4 mr-2" />
+          Refresh
+        </Button>
+      </div>
+
+      {/* Stats Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="border-l-4 border-l-gradient-primary">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Total Students</p>
+                <p className="text-2xl font-bold">{students.length}</p>
+              </div>
+              <GraduationCap className="h-8 w-8 text-gradient-primary" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-l-4 border-l-gradient-secondary">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Active Students</p>
+                <p className="text-2xl font-bold">{filteredStudents.length}</p>
+              </div>
+              <Users className="h-8 w-8 text-gradient-secondary" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-l-4 border-l-gradient-accent">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Classes</p>
+                <p className="text-2xl font-bold">{new Set(students.map(s => s.school_class)).size}</p>
+              </div>
+              <BookOpen className="h-8 w-8 text-gradient-accent" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        {/* ... (Dialog code is unchanged, it's already user-friendly) ... */}
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{isEditing ? "Edit Student" : "Add New Student"}</DialogTitle>
+            <DialogDescription>
+              {isEditing ? "Update the student's information." : "Enter the details for the new student."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="user.first_name">First Name</Label>
+                <Input
+                  id="user.first_name"
+                  name="user.first_name"
+                  value={formData.user.first_name}
+                  onChange={handleFormChange}
+                  placeholder="Enter first name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="user.last_name">Last Name</Label>
+                <Input
+                  id="user.last_name"
+                  name="user.last_name"
+                  value={formData.user.last_name}
+                  onChange={handleFormChange}
+                  placeholder="Enter last name"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="user.username">Username</Label>
+              <Input
+                id="user.username"
+                name="user.username"
+                value={formData.user.username}
+                onChange={handleFormChange}
+                placeholder="Enter username"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="user.email">Email</Label>
+              <Input
+                id="user.email"
+                name="user.email"
+                type="email"
+                value={formData.user.email}
+                onChange={handleFormChange}
+                placeholder="Enter email"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="school_class">Class</Label>
+              <Input
+                id="school_class"
+                name="school_class"
+                value={formData.school_class}
+                onChange={handleFormChange}
+                placeholder="Enter class (e.g., 10A)"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline" disabled={isSubmitting}>
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button onClick={handleSubmit} disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isEditing ? "Update" : "Create"} Student
+            </Button>
+          </DialogFooter>
+        </DialogContent>
       </Dialog>
 
       <Card>

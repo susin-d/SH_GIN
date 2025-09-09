@@ -229,6 +229,71 @@ export function FeesManagement({ userRole }: FeesManagementProps) {
 
   return (
     <div className="space-y-6">
+      {/* Header Section */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold">Fee Management</h1>
+          <p className="text-muted-foreground">Manage student fees, payments, and financial records</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+          <DollarSign className="h-4 w-4 mr-2" />
+          Refresh
+        </Button>
+      </div>
+
+      {/* Stats Overview - Only show for principal */}
+      {userRole === 'principal' && feeStats && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card className="border-l-4 border-l-gradient-primary">
+            <CardContent className="pt-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Total Collected</p>
+                  <p className="text-2xl font-bold">${feeStats.totalCollected.toLocaleString()}</p>
+                </div>
+                <DollarSign className="h-8 w-8 text-gradient-primary" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-l-4 border-l-gradient-secondary">
+            <CardContent className="pt-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Pending</p>
+                  <p className="text-2xl font-bold">${feeStats.totalPending.toLocaleString()}</p>
+                </div>
+                <AlertCircle className="h-8 w-8 text-gradient-secondary" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-l-4 border-l-red-500">
+            <CardContent className="pt-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Overdue</p>
+                  <p className="text-2xl font-bold text-red-600">${feeStats.totalOverdue.toLocaleString()}</p>
+                </div>
+                <AlertCircle className="h-8 w-8 text-red-500" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-l-4 border-l-gradient-accent">
+            <CardContent className="pt-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Collection Rate</p>
+                  <p className="text-2xl font-bold">{feeStats.collectionRate}%</p>
+                </div>
+                <CheckCircle className="h-8 w-8 text-gradient-accent" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       <Dialog open={isFeeDialogOpen} onOpenChange={setIsFeeDialogOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Add New Fee</DialogTitle><DialogDescription>Create a new fee record for a student or an entire class.</DialogDescription></DialogHeader>

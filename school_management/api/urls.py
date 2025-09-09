@@ -2,7 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 from . import views
-from .views import StudentDashboardView, AdminUserUpdateView, StudentDetailView # Import AdminUserUpdateView
+from .views import StudentDashboardView, AdminUserUpdateView, StudentDetailView, DatabaseSnapshotView, ReportManagementViewSet # Import AdminUserUpdateView
 from .views import FeeActionsView # Import the new view
 
 router = DefaultRouter()
@@ -17,6 +17,8 @@ router.register(r'attendance', views.AttendanceViewSet, basename='attendance')
 router.register(r'timetable', views.TimetableViewSet, basename='timetable')
 router.register(r'leaves', views.LeaveRequestViewSet, basename='leave')
 router.register(r'reports', views.ReportViewSet, basename='report')
+router.register(r'report-management', views.ReportManagementViewSet, basename='report-management')
+router.register(r'async-tasks', views.AsyncTaskViewSet, basename='async-task')
 router.register(r'periods', views.PeriodViewSet, basename='period')
 router.register(r'tasks', views.TaskViewSet, basename='task')
 
@@ -33,5 +35,6 @@ urlpatterns = [
     path('auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('auth/logout/', views.LogoutView.as_view(), name='auth_logout'),
     path('auth/user/', views.CurrentUserView.as_view(), name='current_user'),
+    path('snapshot/', DatabaseSnapshotView.as_view(), name='database_snapshot'),
     path('', include(router.urls)),
 ]

@@ -143,23 +143,68 @@ export function LeaveManagement({ userRole }: LeaveManagementProps) {
 
   return (
     <div className="space-y-6">
+      {/* Header Section */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold">Leave Management</h1>
+          <p className="text-muted-foreground">
+            {userRole === "principal" ? "Manage all leave requests across the school" : "View and manage your leave requests"}
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+          <Clock className="h-4 w-4 mr-2" />
+          Refresh
+        </Button>
+      </div>
+
       {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Total Requests</CardTitle><FileText className="h-4 w-4 text-muted-foreground" /></CardHeader>
-          <CardContent><div className="text-2xl font-bold">{filteredRequests.length}</div></CardContent>
+        <Card className="border-l-4 border-l-gradient-primary">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Total Requests</p>
+                <p className="text-2xl font-bold">{filteredRequests.length}</p>
+              </div>
+              <FileText className="h-8 w-8 text-gradient-primary" />
+            </div>
+          </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Pending</CardTitle><Clock className="h-4 w-4 text-muted-foreground" /></CardHeader>
-          <CardContent><div className="text-2xl font-bold">{pendingRequests.length}</div></CardContent>
+
+        <Card className="border-l-4 border-l-yellow-500">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Pending</p>
+                <p className="text-2xl font-bold">{pendingRequests.length}</p>
+              </div>
+              <Clock className="h-8 w-8 text-yellow-500" />
+            </div>
+          </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Approved</CardTitle><Check className="h-4 w-4 text-muted-foreground" /></CardHeader>
-          <CardContent><div className="text-2xl font-bold">{approvedRequests.length}</div></CardContent>
+
+        <Card className="border-l-4 border-l-green-500">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Approved</p>
+                <p className="text-2xl font-bold">{approvedRequests.length}</p>
+              </div>
+              <Check className="h-8 w-8 text-green-500" />
+            </div>
+          </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Rejected</CardTitle><X className="h-4 w-4 text-muted-foreground" /></CardHeader>
-          <CardContent><div className="text-2xl font-bold">{rejectedRequests.length}</div></CardContent>
+
+        <Card className="border-l-4 border-l-red-500">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Rejected</p>
+                <p className="text-2xl font-bold">{rejectedRequests.length}</p>
+              </div>
+              <X className="h-8 w-8 text-red-500" />
+            </div>
+          </CardContent>
         </Card>
       </div>
 
