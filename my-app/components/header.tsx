@@ -2,6 +2,7 @@
 
 import { ThemeToggle } from "./theme-provider"
 import { Button } from "./ui/button"
+import { SidebarTrigger } from "./ui/sidebar"
 import { GraduationCap, LogOut } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 
@@ -16,6 +17,7 @@ export function Header() {
     <header className="sticky top-0 z-50 w-full border-b border-white/20 dark:border-slate-700/20 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-slate-900/60 shadow-sm">
       <div className="container flex h-16 items-center justify-between px-4">
         <div className="flex items-center space-x-4">
+          <SidebarTrigger className="-ml-1" />
           <div className="flex items-center space-x-3 group">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-gradient-primary to-gradient-secondary shadow-lg group-hover:shadow-xl transition-all duration-300 transform group-hover:scale-105">
               <GraduationCap className="h-6 w-6 text-white" />

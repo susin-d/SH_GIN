@@ -32,8 +32,8 @@ import {
 interface DashboardStats {
   totalStudents: number
   totalTeachers: number
-  pendingLeaves: number
   totalClasses: number
+  attendancePercentage: number
 }
 
 
@@ -47,6 +47,8 @@ export function PrincipalDashboard() {
   const [error, setError] = useState<string | null>(null)
   const [asyncDemoLoading, setAsyncDemoLoading] = useState(false)
   const [asyncDemoResult, setAsyncDemoResult] = useState<string | null>(null)
+  const [recentAnnouncements, setRecentAnnouncements] = useState<any[]>([])
+  const [upcomingEvents, setUpcomingEvents] = useState<any[]>([])
 
   const handleHealthCheck = async () => {
     try {
@@ -74,28 +76,46 @@ export function PrincipalDashboard() {
       setIsLoading(true)
       setError(null)
       try {
-        const [studentsRes, teachersRes, leavesRes, classesRes] = await Promise.all([
+        const [studentsRes, teachersRes, classesRes, attendanceRes] = await Promise.all([
           api.students.list(),
           api.teachers.list(),
-          api.leaves.list(),
           api.classes.list(),
+          api.attendance.list(),
         ])
 
-        if (!studentsRes.success || !teachersRes.success || !leavesRes.success || !classesRes.success) {
+        if (!studentsRes.success || !teachersRes.success || !classesRes.success || !attendanceRes.success) {
           throw new Error("Failed to fetch one or more data sources.")
         }
-        
+
         // Set the lists to state
         setStudents(studentsRes.data as any[])
         setTeachers(teachersRes.data as any[])
+
+        // Calculate attendance percentage (assuming attendance has status field)
+        const attendanceData = attendanceRes.data as any[]
+        const totalAttendance = attendanceData.length
+        const presentCount = attendanceData.filter((a: any) => a.status === "present").length
+        const attendancePercentage = totalAttendance > 0 ? Math.round((presentCount / totalAttendance) * 100) : 0
 
         // Calculate stats from the fetched data to ensure consistency
         setStats({
           totalStudents: (studentsRes.data as any[]).length,
           totalTeachers: (teachersRes.data as any[]).length,
           totalClasses: (classesRes.data as any[]).length,
-          pendingLeaves: (leavesRes.data as any[]).filter((l: any) => l.status === "pending").length,
+          attendancePercentage,
         })
+
+        // Set placeholders for announcements and events
+        setRecentAnnouncements([
+          { id: 1, title: "School Holiday Notice", date: "2024-09-15", content: "School will be closed on Monday due to holiday." },
+          { id: 2, title: "PTA Meeting", date: "2024-09-14", content: "Parent-Teacher Association meeting scheduled for next week." },
+          { id: 3, title: "Exam Schedule", date: "2024-09-13", content: "Mid-term examinations will start from October 1st." },
+        ])
+        setUpcomingEvents([
+          { id: 1, title: "Sports Day", date: "2024-10-05", description: "Annual sports day event" },
+          { id: 2, title: "Science Fair", date: "2024-10-15", description: "Inter-school science fair" },
+          { id: 3, title: "Cultural Fest", date: "2024-10-20", description: "Annual cultural festival" },
+        ])
       } catch (err: any) {
         setError("Failed to load dashboard data.")
       } finally {
@@ -234,13 +254,36 @@ export function PrincipalDashboard() {
     }
   };
 
-  const handleManagePeriods = async () => {
+  const handleAddNewStudent = () => {
+    router.push("/students");
+    toast({
+      title: "Navigate to Students",
+      description: "Redirecting to student management page.",
+    });
+  };
+
+  const handleAddNewTeacher = () => {
+    router.push("/teachers");
+    toast({
+      title: "Navigate to Teachers",
+      description: "Redirecting to teacher management page.",
+    });
+  };
+
+  const handleSendAnnouncement = () => {
+    toast({
+      title: "Send Announcement",
+      description: "Announcement feature coming soon.",
+    });
+  };
+
+  const handleGenerateReport = async () => {
     try {
-      const response = await api.periods.list();
+      const response = await api.reports.generate({ report_type: "academic", format: "json" });
       if (response.success) {
         toast({
-          title: "School Periods",
-          description: `Total periods: ${(response.data as any[]).length}`,
+          title: "Report Generated",
+          description: "Report has been generated successfully. Check the Reports page to view and download it.",
         });
       } else {
         throw new Error(response.message);
@@ -248,8 +291,8 @@ export function PrincipalDashboard() {
     } catch (error: any) {
       toast({
         variant: "destructive",
-        title: "Failed to Fetch Periods",
-        description: error.message || "Unable to fetch periods.",
+        title: "Failed to Generate Report",
+        description: error.message || "Unable to generate report.",
       });
     }
   };
@@ -419,8 +462,8 @@ export function PrincipalDashboard() {
           </Card>
           <Card className="stats-card-purple group hover:scale-105 transition-all duration-300 animate-fade-in border-0 shadow-xl" style={{ animationDelay: '0.3s' }}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-              <CardTitle className="text-sm font-semibold text-white/90">Pending Leaves</CardTitle>
-              <Clock className="h-5 w-5 text-white/80" />
+              <CardTitle className="text-sm font-semibold text-white/90">Attendance Today</CardTitle>
+              <CheckCircle className="h-5 w-5 text-white/80" />
             </CardHeader>
             <CardContent className="pt-0">
               <div className="text-3xl font-bold text-white mb-1">
@@ -430,10 +473,72 @@ export function PrincipalDashboard() {
                     <span className="text-lg">Loading</span>
                   </div>
                 ) : (
-                  stats?.pendingLeaves || 0
+                  `${stats?.attendancePercentage || 0}%`
                 )}
               </div>
-              <p className="text-xs text-white/70 font-medium">Awaiting approval</p>
+              <p className="text-xs text-white/70 font-medium">Present today</p>
+              <div className="mt-2">
+                <div className="w-full bg-white/20 rounded-full h-2">
+                  <div
+                    className="bg-white h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${stats?.attendancePercentage || 0}%` }}
+                  ></div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Additional Widgets */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Recent Announcements */}
+          <Card className="backdrop-blur-sm bg-white/90 dark:bg-slate-800/90 border-white/20 dark:border-slate-700/20 shadow-xl animate-slide-up" style={{ animationDelay: '0.4s' }}>
+            <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-700 rounded-t-lg">
+              <CardTitle className="text-xl font-bold flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg">
+                  <FileText className="h-5 w-5 text-white" />
+                </div>
+                Recent Announcements
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="space-y-4">
+                {recentAnnouncements.slice(0, 3).map((announcement: any) => (
+                  <div key={announcement.id} className="border-l-4 border-blue-500 pl-4 py-2">
+                    <h4 className="font-semibold text-sm">{announcement.title}</h4>
+                    <p className="text-xs text-muted-foreground">{announcement.date}</p>
+                    <p className="text-sm mt-1">{announcement.content}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Upcoming Events */}
+          <Card className="backdrop-blur-sm bg-white/90 dark:bg-slate-800/90 border-white/20 dark:border-slate-700/20 shadow-xl animate-slide-up" style={{ animationDelay: '0.5s' }}>
+            <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-slate-800 dark:to-slate-700 rounded-t-lg">
+              <CardTitle className="text-xl font-bold flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg">
+                  <Calendar className="h-5 w-5 text-white" />
+                </div>
+                Upcoming Events
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="space-y-4">
+                {upcomingEvents.slice(0, 3).map((event: any) => (
+                  <div key={event.id} className="flex items-start gap-3">
+                    <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
+                      <Calendar className="h-4 w-4 text-green-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-sm">{event.title}</h4>
+                      <p className="text-xs text-muted-foreground">{event.date}</p>
+                      <p className="text-sm mt-1">{event.description}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -451,30 +556,22 @@ export function PrincipalDashboard() {
               Access common management tasks with one click
             </CardDescription>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
-            <Button variant="outline" className="h-24 flex-col gap-3 hover:bg-gradient-to-br hover:from-blue-50 hover:to-indigo-50 dark:hover:from-blue-900/20 dark:hover:to-indigo-900/20 transition-all duration-300 border-2 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-lg transform hover:scale-105" onClick={handleAcademicReport}>
-              <BarChart3 className="h-6 w-6 text-blue-600" />
-              <span className="text-sm font-semibold">Academic Report</span>
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-6">
+            <Button variant="outline" className="h-24 flex-col gap-3 hover:bg-gradient-to-br hover:from-blue-50 hover:to-indigo-50 dark:hover:from-blue-900/20 dark:hover:to-indigo-900/20 transition-all duration-300 border-2 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-lg transform hover:scale-105" onClick={handleAddNewStudent}>
+              <Plus className="h-6 w-6 text-blue-600" />
+              <span className="text-sm font-semibold">Add New Student</span>
             </Button>
-            <Button variant="outline" className="h-24 flex-col gap-3 hover:bg-gradient-to-br hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900/20 dark:hover:to-emerald-900/20 transition-all duration-300 border-2 hover:border-green-300 dark:hover:border-green-600 hover:shadow-lg transform hover:scale-105" onClick={handleFeesSummaryReport}>
-              <FileText className="h-6 w-6 text-green-600" />
-              <span className="text-sm font-semibold">Fees Summary</span>
+            <Button variant="outline" className="h-24 flex-col gap-3 hover:bg-gradient-to-br hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900/20 dark:hover:to-emerald-900/20 transition-all duration-300 border-2 hover:border-green-300 dark:hover:border-green-600 hover:shadow-lg transform hover:scale-105" onClick={handleAddNewTeacher}>
+              <Plus className="h-6 w-6 text-green-600" />
+              <span className="text-sm font-semibold">Add New Teacher</span>
             </Button>
-            <Button variant="outline" className="h-24 flex-col gap-3 hover:bg-gradient-to-br hover:from-purple-50 hover:to-pink-50 dark:hover:from-purple-900/20 dark:hover:to-pink-900/20 transition-all duration-300 border-2 hover:border-purple-300 dark:hover:border-purple-600 hover:shadow-lg transform hover:scale-105" onClick={handleSendFeeReminders}>
+            <Button variant="outline" className="h-24 flex-col gap-3 hover:bg-gradient-to-br hover:from-purple-50 hover:to-pink-50 dark:hover:from-purple-900/20 dark:hover:to-pink-900/20 transition-all duration-300 border-2 hover:border-purple-300 dark:hover:border-purple-600 hover:shadow-lg transform hover:scale-105" onClick={handleSendAnnouncement}>
               <Send className="h-6 w-6 text-purple-600" />
-              <span className="text-sm font-semibold">Send Reminders</span>
+              <span className="text-sm font-semibold">Send Announcement</span>
             </Button>
-            <Button variant="outline" className="h-24 flex-col gap-3 hover:bg-gradient-to-br hover:from-orange-50 hover:to-yellow-50 dark:hover:from-orange-900/20 dark:hover:to-yellow-900/20 transition-all duration-300 border-2 hover:border-orange-300 dark:hover:border-orange-600 hover:shadow-lg transform hover:scale-105" onClick={handleCreateClassFee}>
-              <Plus className="h-6 w-6 text-orange-600" />
-              <span className="text-sm font-semibold">Create Class Fee</span>
-            </Button>
-            <Button variant="outline" className="h-24 flex-col gap-3 hover:bg-gradient-to-br hover:from-red-50 hover:to-rose-50 dark:hover:from-red-900/20 dark:hover:to-rose-900/20 transition-all duration-300 border-2 hover:border-red-300 dark:hover:border-red-600 hover:shadow-lg transform hover:scale-105" onClick={handleViewAllTasks}>
-              <Clock className="h-6 w-6 text-red-600" />
-              <span className="text-sm font-semibold">View All Tasks</span>
-            </Button>
-            <Button variant="outline" className="h-24 flex-col gap-3 hover:bg-gradient-to-br hover:from-teal-50 hover:to-cyan-50 dark:hover:from-teal-900/20 dark:hover:to-cyan-900/20 transition-all duration-300 border-2 hover:border-teal-300 dark:hover:border-teal-600 hover:shadow-lg transform hover:scale-105" onClick={handleManagePeriods}>
-              <Settings className="h-6 w-6 text-teal-600" />
-              <span className="text-sm font-semibold">Manage Periods</span>
+            <Button variant="outline" className="h-24 flex-col gap-3 hover:bg-gradient-to-br hover:from-orange-50 hover:to-yellow-50 dark:hover:from-orange-900/20 dark:hover:to-yellow-900/20 transition-all duration-300 border-2 hover:border-orange-300 dark:hover:border-orange-600 hover:shadow-lg transform hover:scale-105" onClick={handleGenerateReport}>
+              <BarChart3 className="h-6 w-6 text-orange-600" />
+              <span className="text-sm font-semibold">Generate Report</span>
             </Button>
           </CardContent>
         </Card>

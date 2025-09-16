@@ -2,16 +2,15 @@
 
 import { useAuth } from "@/lib/auth-context"
 import { LoginForm } from "@/components/login-form"
-import { PrincipalDashboard } from "@/components/principal-dashboard"
-import { TeacherDashboard } from "@/components/teacher-dashboard"
-import { StudentDashboard } from "@/components/student-dashboard"
+import { EnhancedDashboard } from "@/components/enhanced-dashboard"
+import { AppSidebar } from "@/components/sidebar"
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { Header } from "@/components/header"
-import { Button } from "@/components/ui/button"
 import { Heart, Sparkles, Loader2 } from "lucide-react"
 import { api } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
 
-function Dashboard() {
+function DashboardContent() {
   const { user } = useAuth()
   const { toast } = useToast()
 
@@ -37,30 +36,9 @@ function Dashboard() {
 
   if (!user) return null
 
-  const getRoleDescription = (role: string) => {
-    switch (role) {
-      case "principal":
-        return "Welcome to your administrative dashboard"
-      case "teacher":
-        return "Welcome to your teaching dashboard"
-      case "student":
-        return "Welcome to your student portal"
-      default:
-        return "Welcome to your dashboard"
-    }
-  }
-
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-
-      <main className="container mx-auto px-4 py-8">
-        <div className="space-y-8">
-          {user.role === "principal" && <PrincipalDashboard />}
-          {user.role === "teacher" && <TeacherDashboard />}
-          {user.role === "student" && <StudentDashboard />}
-        </div>
-      </main>
+    <div className="flex-1 container mx-auto px-4 py-8">
+      <EnhancedDashboard />
     </div>
   )
 }
@@ -92,5 +70,17 @@ export default function HomePage() {
     )
   }
 
-  return user ? <Dashboard /> : <LoginForm />
+  if (user) {
+    return (
+      <SidebarProvider>
+        <AppSidebar />
+        <SidebarInset>
+          <Header />
+          <DashboardContent />
+        </SidebarInset>
+      </SidebarProvider>
+    )
+  }
+
+  return <LoginForm />
 }

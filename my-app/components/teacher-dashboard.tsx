@@ -26,6 +26,9 @@ import {
   Settings,
   Download,
   Eye,
+  Calendar,
+  Megaphone,
+  UserCheck,
 } from "lucide-react"
 import { LeaveManagement } from "./leave-management"
 import { TimetableManagement } from "./timetable-management"
@@ -176,6 +179,10 @@ export function TeacherDashboard() {
   const [students, setStudents] = useState<StudentFromAPI[]>([])
   const [tasks, setTasks] = useState<any[]>([])
   const [todayTasks, setTodayTasks] = useState<any[]>([])
+  const [todayClasses, setTodayClasses] = useState<SchoolClass[]>([])
+  const [todaySchedule, setTodaySchedule] = useState<any[]>([])
+  const [pendingAssignments, setPendingAssignments] = useState<number>(0)
+  const [recentAnnouncements, setRecentAnnouncements] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -225,6 +232,27 @@ export function TeacherDashboard() {
           total_classes: Array.isArray(classesRes.data) ? classesRes.data.length : 0,
           total_students: totalStudents,
         })
+
+        // Set today's classes (placeholder: all classes)
+        if (classesRes.success && Array.isArray(classesRes.data)) {
+          setTodayClasses(classesRes.data)
+        }
+
+        // Fetch today's schedule (placeholder)
+        const today = new Date().toISOString().split('T')[0]
+        const scheduleRes = await api.timetable.list() // Placeholder, should filter by date and teacher
+        if (scheduleRes.success && Array.isArray(scheduleRes.data)) {
+          setTodaySchedule(scheduleRes.data.slice(0, 3)) // Placeholder: first 3
+        }
+
+        // Set pending assignments (placeholder)
+        setPendingAssignments(5) // Placeholder count
+
+        // Set recent announcements (placeholder)
+        setRecentAnnouncements([
+          { id: 1, title: "School Holiday Notice", date: "2024-09-15" },
+          { id: 2, title: "PTA Meeting", date: "2024-09-14" },
+        ])
       } catch (err: any) {
         setError(err.message || "An unexpected error occurred while loading your dashboard.")
         console.error(err)
@@ -329,16 +357,22 @@ export function TeacherDashboard() {
                   <span className="text-lg">Loading</span>
                 </div>
               ) : (
-                stats?.total_classes ?? 0
+                todayClasses.length
               )}
             </div>
-            <p className="text-xs text-white/70 font-medium">Assigned classes</p>
+            <p className="text-xs text-white/70 font-medium">Classes today</p>
+            <div className="mt-2 space-y-1">
+              {todayClasses.slice(0, 2).map((cls) => (
+                <p key={cls.id} className="text-xs text-white/60">{cls.name}</p>
+              ))}
+              {todayClasses.length > 2 && <p className="text-xs text-white/60">+{todayClasses.length - 2} more</p>}
+            </div>
           </CardContent>
         </Card>
         <Card className="stats-card-green group hover:scale-105 transition-all duration-300 border-0 shadow-xl" style={{ animationDelay: '0.1s' }}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-            <CardTitle className="text-sm font-semibold text-white/90">Total Students</CardTitle>
-            <Users className="h-5 w-5 text-white/80" />
+            <CardTitle className="text-sm font-semibold text-white/90">Today's Schedule</CardTitle>
+            <Calendar className="h-5 w-5 text-white/80" />
           </CardHeader>
           <CardContent className="pt-0">
             <div className="text-3xl font-bold text-white mb-1">
@@ -348,26 +382,21 @@ export function TeacherDashboard() {
                   <span className="text-lg">Loading</span>
                 </div>
               ) : (
-                stats?.total_students ?? 0
+                todaySchedule.length
               )}
             </div>
-            <p className="text-xs text-white/70 font-medium">Across all classes</p>
+            <p className="text-xs text-white/70 font-medium">Periods scheduled</p>
+            <div className="mt-2 space-y-1">
+              {todaySchedule.slice(0, 2).map((period: any, idx: number) => (
+                <p key={idx} className="text-xs text-white/60">{period.subject || 'Period ' + (idx + 1)}</p>
+              ))}
+            </div>
           </CardContent>
         </Card>
         <Card className="stats-card-orange group hover:scale-105 transition-all duration-300 border-0 shadow-xl" style={{ animationDelay: '0.2s' }}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-            <CardTitle className="text-sm font-semibold text-white/90">Attendance Rate</CardTitle>
-            <BarChart3 className="h-5 w-5 text-white/80" />
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="text-3xl font-bold text-white mb-1">91.5%</div>
-            <p className="text-xs text-white/70 font-medium">Overall performance</p>
-          </CardContent>
-        </Card>
-        <Card className="stats-card-purple group hover:scale-105 transition-all duration-300 border-0 shadow-xl" style={{ animationDelay: '0.3s' }}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-            <CardTitle className="text-sm font-semibold text-white/90">Pending Tasks</CardTitle>
-            <AlertCircle className="h-5 w-5 text-white/80" />
+            <CardTitle className="text-sm font-semibold text-white/90">Pending Assignments</CardTitle>
+            <FileText className="h-5 w-5 text-white/80" />
           </CardHeader>
           <CardContent className="pt-0">
             <div className="text-3xl font-bold text-white mb-1">
@@ -377,10 +406,34 @@ export function TeacherDashboard() {
                   <span className="text-lg">Loading</span>
                 </div>
               ) : (
-                todayTasks.filter((task: any) => task.status === 'pending').length
+                pendingAssignments
               )}
             </div>
-            <p className="text-xs text-white/70 font-medium">Due today</p>
+            <p className="text-xs text-white/70 font-medium">To grade</p>
+          </CardContent>
+        </Card>
+        <Card className="stats-card-purple group hover:scale-105 transition-all duration-300 border-0 shadow-xl" style={{ animationDelay: '0.3s' }}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-sm font-semibold text-white/90">Recent Announcements</CardTitle>
+            <Megaphone className="h-5 w-5 text-white/80" />
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="text-3xl font-bold text-white mb-1">
+              {isLoading ? (
+                <div className="flex items-center space-x-2">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                  <span className="text-lg">Loading</span>
+                </div>
+              ) : (
+                recentAnnouncements.length
+              )}
+            </div>
+            <p className="text-xs text-white/70 font-medium">New updates</p>
+            <div className="mt-2 space-y-1">
+              {recentAnnouncements.slice(0, 2).map((ann: any) => (
+                <p key={ann.id} className="text-xs text-white/60 truncate">{ann.title}</p>
+              ))}
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -399,23 +452,23 @@ export function TeacherDashboard() {
           </CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-6">
-          <Button variant="outline" className="h-24 flex-col gap-3 hover:bg-gradient-to-br hover:from-blue-50 hover:to-indigo-50 dark:hover:from-blue-900/20 dark:hover:to-indigo-900/20 transition-all duration-300 border-2 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-lg transform hover:scale-105" onClick={() => setActiveTab("tasks")}>
-            <CheckCircle className="h-6 w-6 text-blue-600" />
-            <span className="text-sm font-semibold">Today's Tasks</span>
-          </Button>
-          <Button variant="outline" className="h-24 flex-col gap-3 hover:bg-gradient-to-br hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900/20 dark:hover:to-emerald-900/20 transition-all duration-300 border-2 hover:border-green-300 dark:hover:border-green-600 hover:shadow-lg transform hover:scale-105" onClick={() => setActiveTab("students")}>
-            <Users className="h-6 w-6 text-green-600" />
-            <span className="text-sm font-semibold">Student List</span>
-          </Button>
-          <Button variant="outline" className="h-24 flex-col gap-3 hover:bg-gradient-to-br hover:from-purple-50 hover:to-pink-50 dark:hover:from-purple-900/20 dark:hover:to-pink-900/20 transition-all duration-300 border-2 hover:border-purple-300 dark:hover:border-purple-600 hover:shadow-lg transform hover:scale-105" onClick={() => setActiveTab("classes")}>
-            <BookOpen className="h-6 w-6 text-purple-600" />
-            <span className="text-sm font-semibold">My Classes</span>
-          </Button>
-          <Button variant="outline" className="h-24 flex-col gap-3 hover:bg-gradient-to-br hover:from-orange-50 hover:to-yellow-50 dark:hover:from-orange-900/20 dark:hover:to-yellow-900/20 transition-all duration-300 border-2 hover:border-orange-300 dark:hover:border-orange-600 hover:shadow-lg transform hover:scale-105" onClick={() => setActiveTab("timetable")}>
-            <Clock className="h-6 w-6 text-orange-600" />
-            <span className="text-sm font-semibold">My Schedule</span>
-          </Button>
-        </CardContent>
+           <Button variant="outline" className="h-24 flex-col gap-3 hover:bg-gradient-to-br hover:from-blue-50 hover:to-indigo-50 dark:hover:from-blue-900/20 dark:hover:to-indigo-900/20 transition-all duration-300 border-2 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-lg transform hover:scale-105" onClick={() => toast({ title: "Take Attendance", description: "Feature coming soon!" })}>
+             <UserCheck className="h-6 w-6 text-blue-600" />
+             <span className="text-sm font-semibold">Take Attendance</span>
+           </Button>
+           <Button variant="outline" className="h-24 flex-col gap-3 hover:bg-gradient-to-br hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900/20 dark:hover:to-emerald-900/20 transition-all duration-300 border-2 hover:border-green-300 dark:hover:border-green-600 hover:shadow-lg transform hover:scale-105" onClick={() => toast({ title: "Create Assignment", description: "Feature coming soon!" })}>
+             <Plus className="h-6 w-6 text-green-600" />
+             <span className="text-sm font-semibold">Create Assignment</span>
+           </Button>
+           <Button variant="outline" className="h-24 flex-col gap-3 hover:bg-gradient-to-br hover:from-purple-50 hover:to-pink-50 dark:hover:from-purple-900/20 dark:hover:to-pink-900/20 transition-all duration-300 border-2 hover:border-purple-300 dark:hover:border-purple-600 hover:shadow-lg transform hover:scale-105" onClick={() => toast({ title: "Enter Marks", description: "Feature coming soon!" })}>
+             <Edit className="h-6 w-6 text-purple-600" />
+             <span className="text-sm font-semibold">Enter Marks</span>
+           </Button>
+           <Button variant="outline" className="h-24 flex-col gap-3 hover:bg-gradient-to-br hover:from-orange-50 hover:to-yellow-50 dark:hover:from-orange-900/20 dark:hover:to-yellow-900/20 transition-all duration-300 border-2 hover:border-orange-300 dark:hover:border-orange-600 hover:shadow-lg transform hover:scale-105" onClick={() => toast({ title: "Send Message to Parents", description: "Feature coming soon!" })}>
+             <Send className="h-6 w-6 text-orange-600" />
+             <span className="text-sm font-semibold">Send Message to Parents</span>
+           </Button>
+         </CardContent>
       </Card>
 
       {/* Main Content Tabs */}

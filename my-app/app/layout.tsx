@@ -2,6 +2,7 @@ import type React from "react"
 import type { Metadata, Viewport } from "next"
 import { Inter } from "next/font/google"
 import { AuthProvider } from "@/lib/auth-context"
+import { CacheProvider } from "@/lib/cache-context"
 import { ThemeProvider } from "@/components/theme-provider"
 import "./globals.css"
 
@@ -41,13 +42,15 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen bg-background font-sans antialiased">
         <ThemeProvider defaultTheme="system" storageKey="school-portal-theme">
-          <AuthProvider>
-            <div className="relative flex min-h-screen flex-col">
-              <div className="flex-1">
-                {children}
+          <CacheProvider>
+            <AuthProvider>
+              <div className="relative flex min-h-screen flex-col">
+                <div className="flex-1">
+                  {children}
+                </div>
               </div>
-            </div>
-          </AuthProvider>
+            </AuthProvider>
+          </CacheProvider>
         </ThemeProvider>
       </body>
     </html>

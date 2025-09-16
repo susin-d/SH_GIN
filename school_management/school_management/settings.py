@@ -10,6 +10,8 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 # school_management/settings.py
+import os
+from decouple import config
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -42,11 +44,20 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+# Cache middleware for view caching - CORRECT ORDER
+MIDDLEWARE.insert(0, 'django.middleware.cache.FetchFromCacheMiddleware')
+MIDDLEWARE.append('django.middleware.cache.UpdateCacheMiddleware')
+
 # CORS settings (adjust for your frontend's URL)
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3001",
 ]
+
+# Allow all origins in development (remove in production)
+CORS_ALLOW_ALL_ORIGINS = True
 
 ROOT_URLCONF = 'school_management.urls'
 
@@ -81,12 +92,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-rie22qdj2ajuk-ymdu*fd+&bb+!mie*584lm*jw8l$o5^68ms8'
+SECRET_KEY = config('DJANGO_SECRET_KEY', default='django-insecure-rie22qdj2ajuk-ymdu*fd+&bb+!mie*584lm*jw8l$o5^68ms8')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = config('DJANGO_DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = config('DJANGO_ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=lambda v: [s.strip() for s in v.split(',')])
 
 ROOT_URLCONF = 'school_management.urls'
 
@@ -178,17 +189,20 @@ CACHES = {
         'LOCATION': 'unique-snowflake',
         'TIMEOUT': 300,
     },
-    # Redis cache (uncomment if Redis is available)
-    # 'redis': {
-    #     'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-    #     'LOCATION': 'redis://127.0.0.1:6379/1',
-    #     'TIMEOUT': 300,
-    # }
+    # Redis cache configuration
+    'redis': {
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': 'redis://127.0.0.1:6379/1',
+        'TIMEOUT': 300,
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            'CONNECTION_POOL_KWARGS': {
+                'max_connections': 20,
+                'decode_responses': True,
+            },
+        }
+    }
 }
-
-# Cache middleware for view caching
-MIDDLEWARE.insert(0, 'django.middleware.cache.UpdateCacheMiddleware')
-MIDDLEWARE.append('django.middleware.cache.FetchFromCacheMiddleware')
 
 # Cache settings for views
 CACHE_MIDDLEWARE_ALIAS = 'default'

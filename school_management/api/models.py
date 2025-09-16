@@ -2,6 +2,19 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
 
+# === School Model ===
+
+class School(models.Model):
+    name = models.CharField(max_length=200)
+    address = models.TextField()
+    phone = models.CharField(max_length=20, blank=True)
+    email = models.EmailField(blank=True)
+    principal = models.OneToOneField('User', on_delete=models.SET_NULL, null=True, blank=True, related_name='school_principal', limit_choices_to={'role': 'principal'})
+    established_year = models.PositiveIntegerField(blank=True, null=True)
+
+    def __str__(self):
+        return self.name
+
 # === User and Profile Models ===
 
 class User(AbstractUser):
@@ -29,6 +42,29 @@ class UserProfile(models.Model):
     address = models.TextField(blank=True, null=True)
     class_name = models.CharField(max_length=100, blank=True, null=True)
     subject = models.CharField(max_length=100, blank=True, null=True)
+    date_of_birth = models.DateField(blank=True, null=True)
+    gender = models.CharField(max_length=10, choices=[('male', 'Male'), ('female', 'Female'), ('other', 'Other')], blank=True)
+    emergency_contact = models.CharField(max_length=100, blank=True)
+    emergency_phone = models.CharField(max_length=20, blank=True)
+    blood_group = models.CharField(max_length=5, blank=True)
+    nationality = models.CharField(max_length=50, blank=True)
+    religion = models.CharField(max_length=50, blank=True)
+    # Additional personal details
+    aadhar_number = models.CharField(max_length=12, blank=True, help_text="12-digit Aadhar number")
+    pan_number = models.CharField(max_length=10, blank=True, help_text="PAN card number")
+    marital_status = models.CharField(max_length=20, choices=[('single', 'Single'), ('married', 'Married'), ('divorced', 'Divorced'), ('widowed', 'Widowed')], blank=True)
+    languages_known = models.CharField(max_length=200, blank=True, help_text="Comma-separated list of languages")
+    medical_conditions = models.TextField(blank=True, help_text="Any medical conditions or allergies")
+    # Contact details
+    alternate_phone = models.CharField(max_length=20, blank=True)
+    whatsapp_number = models.CharField(max_length=20, blank=True)
+    personal_email = models.EmailField(blank=True)
+    # Address details
+    permanent_address = models.TextField(blank=True)
+    city = models.CharField(max_length=50, blank=True)
+    state = models.CharField(max_length=50, blank=True)
+    pincode = models.CharField(max_length=10, blank=True)
+    country = models.CharField(max_length=50, blank=True, default='India')
 
     def __str__(self):
         return self.user.username
@@ -45,13 +81,21 @@ class SchoolClass(models.Model):
 class Student(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True, limit_choices_to={'role': User.Role.STUDENT})
     school_class = models.ForeignKey(SchoolClass, on_delete=models.SET_NULL, null=True, blank=True, related_name='students')
+    admission_date = models.DateField(blank=True, null=True)
+    roll_number = models.CharField(max_length=20, blank=True)
+    father_name = models.CharField(max_length=100, blank=True)
+    mother_name = models.CharField(max_length=100, blank=True)
 
     def __str__(self):
         return self.user.get_full_name() or self.user.username
 
 class Teacher(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True, limit_choices_to={'role': User.Role.TEACHER})
-    
+    hire_date = models.DateField(blank=True, null=True)
+    qualification = models.CharField(max_length=200, blank=True)
+    experience_years = models.PositiveIntegerField(blank=True, null=True)
+    specialization = models.CharField(max_length=100, blank=True)
+
     def __str__(self):
         return self.user.get_full_name() or self.user.username
 

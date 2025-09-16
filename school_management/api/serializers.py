@@ -9,13 +9,32 @@ from .models import *
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
-        fields = ['phone', 'address', 'class_name', 'subject']
+        fields = [
+            'phone', 'address', 'class_name', 'subject', 'date_of_birth', 'gender',
+            'emergency_contact', 'emergency_phone', 'blood_group', 'nationality', 'religion',
+            'aadhar_number', 'pan_number', 'marital_status', 'languages_known', 'medical_conditions',
+            'alternate_phone', 'whatsapp_number', 'personal_email', 'permanent_address',
+            'city', 'state', 'pincode', 'country'
+        ]
 
 class UserSerializer(serializers.ModelSerializer):
-    profile = UserProfileSerializer(read_only=True)
+    profile = UserProfileSerializer(required=False)
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'first_name', 'last_name', 'role', 'profile']
+        extra_kwargs = {
+            'username': {'required': False},
+            'email': {'required': False},
+            'first_name': {'required': False},
+            'last_name': {'required': False},
+            'role': {'required': False},
+        }
+
+class SchoolSerializer(serializers.ModelSerializer):
+    principal = UserSerializer(read_only=True)
+    class Meta:
+        model = School
+        fields = '__all__'
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
@@ -47,7 +66,7 @@ class AdminUserUpdateSerializer(serializers.Serializer):
 
 class StudentSerializer(serializers.ModelSerializer):
     user = UserSerializer()
-    school_class = serializers.StringRelatedField() # Display class name instead of ID
+    school_class = serializers.CharField(source='school_class.name', read_only=True) # Display class name
 
     class Meta:
         model = Student
@@ -77,7 +96,16 @@ class StudentSerializer(serializers.ModelSerializer):
         user.last_name = user_data.get('last_name', user.last_name)
         user.save()
 
-        instance.school_class = validated_data.get('school_class', instance.school_class)
+        # Handle profile updates
+        profile_data = user_data.get('profile', {})
+        if profile_data:
+            profile, created = UserProfile.objects.get_or_create(user=user)
+            for field, value in profile_data.items():
+                if value is not None:  # Only update non-null values
+                    setattr(profile, field, value)
+            profile.save()
+
+        # Note: school_class is read-only in serializer, handle separately if needed
         instance.save()
         return instance
 
@@ -87,6 +115,33 @@ class TeacherSerializer(serializers.ModelSerializer):
         model = Teacher
         fields = '__all__'
 
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        user_data = validated_data.pop('user', {})
+        user = instance.user
+
+        user.email = user_data.get('email', user.email)
+        user.first_name = user_data.get('first_name', user.first_name)
+        user.last_name = user_data.get('last_name', user.last_name)
+        user.save()
+
+        # Handle profile updates
+        profile_data = user_data.get('profile', {})
+        if profile_data:
+            profile, created = UserProfile.objects.get_or_create(user=user)
+            for field, value in profile_data.items():
+                if value is not None:  # Only update non-null values
+                    setattr(profile, field, value)
+            profile.save()
+
+        # Update teacher-specific fields
+        instance.hire_date = validated_data.get('hire_date', instance.hire_date)
+        instance.qualification = validated_data.get('qualification', instance.qualification)
+        instance.experience_years = validated_data.get('experience_years', instance.experience_years)
+        instance.specialization = validated_data.get('specialization', instance.specialization)
+        instance.save()
+        return instance
+
 class PeriodSerializer(serializers.ModelSerializer):
     class Meta:
         model = Period
@@ -94,7 +149,7 @@ class PeriodSerializer(serializers.ModelSerializer):
 
 class TimetableSerializer(serializers.ModelSerializer):
     teacher = TeacherSerializer(read_only=True, allow_null=True)
-    period = PeriodSerializer(read_only=True) # <-- Use the new serializer
+    day_of_week_display = serializers.CharField(source='get_day_of_week_display', read_only=True)
 
     class Meta:
         model = Timetable
